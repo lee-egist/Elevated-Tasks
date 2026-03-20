@@ -1,37 +1,47 @@
-name: Deploy Apps Script
+name: Multi-Env Deploy
 
 on:
   push:
-    branches:
-      - main  # Triggers only when code is merged into main
+    branches: [main, develop] # Triggers on both branches
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
 
-      - name: Install Dependencies
-        run: npm install
-
-      # Decodes the .clasprc.json from GitHub Secrets
-      - name: Create clasp auth file
+      - name: Auth Clasp
         run: echo "${{ secrets.CLASPRC_JSON }}" > ~/.clasprc.json
 
-      - name: Push to Apps Script
+      # STEP: Determine Environment Variables
+      - name: Set Environment Variables
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "TARGET_SCRIPT_ID=${{ secrets.PROD_SCRIPT_ID }}" >> $GITHUB_ENV
+            echo "IS_PROD=true" >> $GITHUB_ENV
+          else
+            echo "TARGET_SCRIPT_ID=${{ secrets.DEV_SCRIPT_ID }}" >> $GITHUB_ENV
+            echo "IS_PROD=false" >> $GITHUB_ENV
+          fi
+
+      # STEP: Overwrite .clasp.json dynamically
+      - name: Configure .clasp.json
+        run: |
+          echo "{\"scriptId\":\"$TARGET_SCRIPT_ID\",\"rootDir\":\"src\"}" > .clasp.json
+
+      - name: Push Code
         run: npx @google/clasp push -f
 
-      # Deploys a new version and updates the existing deployment ID
-      - name: Deploy Version
+      # STEP: Only run full 'deploy' for Production
+      - name: Deploy to Production
+        if: env.IS_PROD == 'true'
         run: |
           npx @google/clasp deploy \
-            --deploymentId ${{ secrets.DEPLOYMENT_ID }} \
-            --description "Deployed from GitHub Action (Commit: ${{ github.sha }})"
+            --deploymentId ${{ secrets.PROD_DEPLOYMENT_ID }} \
+            --description "Prod Release: ${{ github.sha }}"
