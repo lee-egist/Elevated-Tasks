@@ -1,4 +1,9 @@
-
+# .Claspignore
+**/**
+!src/**
+!appsscript.json
+.git/**
 README.md
 tests
 .git
+node_modules/**
