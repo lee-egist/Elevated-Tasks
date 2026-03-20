@@ -1,0 +1,7 @@
+# .gitignore
+node_modules/
+.clasprc.json
+.DS_Store
+dist/
+mycprc.json
+
