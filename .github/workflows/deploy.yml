@@ -2,7 +2,7 @@ name: Multi-Env Deploy
 
 on:
   push:
-    branches: [main, develop] # Triggers on both branches
+    branches: [main, develop]
 
 jobs:
   deploy:
@@ -16,10 +16,15 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Auth Clasp
-        run: cat <<EOF > ~/.clasprc.json ${{ secrets.CLASPRC_JSON }} EOF
+      - name: Install Clasp
+        run: npm install -g @google/clasp
 
-      # STEP: Determine Environment Variables
+      - name: Create clasp auth file
+        run: |
+          cat <<EOF > ~/.clasprc.json
+          ${{ secrets.CLASPRC_JSON }}
+          EOF
+
       - name: Set Environment Variables
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
@@ -30,26 +35,14 @@ jobs:
             echo "IS_PROD=false" >> $GITHUB_ENV
           fi
 
-      # DEBUG: Debugging push failure
-      - name: Debug Config Files
-        run: |
-          echo "Checking .clasp.json:"
-          cat .clasp.json
-          echo "Checking .clasprc.json size:"
-          wc -c ~/.clasprc.json
-
-      # STEP: Overwrite .clasp.json dynamically
       - name: Configure .clasp.json
-      - run: |
-          echo '{"scriptId":"'"$TARGET_SCRIPT_ID"'","rootDir":"src"}' > .clasp.json
+        run: |
+          echo "{\"scriptId\":\"$TARGET_SCRIPT_ID\",\"rootDir\":\"src\"}" > .clasp.json
 
       - name: Push Code
-        run: npx @google/clasp push -f
+        run: clasp push -f
 
-      # STEP: Only run full 'deploy' for Production
       - name: Deploy to Production
         if: env.IS_PROD == 'true'
         run: |
-          npx @google/clasp deploy \
-            --deploymentId ${{ secrets.PROD_DEPLOYMENT_ID }} \
-            --description "Prod Release: ${{ github.sha }}"
+          clasp deploy --deploymentId ${{ secrets.PROD_DEPLOYMENT_ID }} --description "Prod Release: ${{ github.sha }}"
