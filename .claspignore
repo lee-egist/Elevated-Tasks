@@ -1,9 +1,6 @@
-# .Claspignore
+# Ignore everything in the repository root
 **/**
+
+# Exceptions: Allow the manifest and the source folder
 !src/**
 !appsscript.json
-.git/**
-README.md
-tests
-.git
-node_modules/**
