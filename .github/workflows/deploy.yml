@@ -17,7 +17,7 @@ jobs:
           node-version: '24'
 
       - name: Auth Clasp
-        run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+        run: cat <<EOF > ~/.clasprc.json ${{ secrets.CLASPRC_JSON }} EOF
 
       # STEP: Determine Environment Variables
       - name: Set Environment Variables
@@ -40,8 +40,8 @@ jobs:
 
       # STEP: Overwrite .clasp.json dynamically
       - name: Configure .clasp.json
-        run: |
-          echo "{\"scriptId\":\"$TARGET_SCRIPT_ID\",\"rootDir\":\"src\"}" > .clasp.json
+      - run: |
+          echo '{"scriptId":"'"$TARGET_SCRIPT_ID"'","rootDir":"src"}' > .clasp.json
 
       - name: Push Code
         run: npx @google/clasp push -f
