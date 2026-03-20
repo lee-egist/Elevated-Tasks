@@ -11,13 +11,13 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Auth Clasp
-        run: echo "${{ secrets.CLASPRC_JSON }}" > ~/.clasprc.json
+        run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
 
       # STEP: Determine Environment Variables
       - name: Set Environment Variables
@@ -29,6 +29,14 @@ jobs:
             echo "TARGET_SCRIPT_ID=${{ secrets.DEV_SCRIPT_ID }}" >> $GITHUB_ENV
             echo "IS_PROD=false" >> $GITHUB_ENV
           fi
+
+      # DEBUG: Debugging push failure
+      - name: Debug Config Files
+        run: |
+          echo "Checking .clasp.json:"
+          cat .clasp.json
+          echo "Checking .clasprc.json size:"
+          wc -c ~/.clasprc.json
 
       # STEP: Overwrite .clasp.json dynamically
       - name: Configure .clasp.json
