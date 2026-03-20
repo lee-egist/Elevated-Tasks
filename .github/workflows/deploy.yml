@@ -48,6 +48,12 @@ jobs:
             echo "The Secret in GitHub does not match the project you are looking at."
           fi
 
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Linter
+        run: npx eslint src/  # This scans everything in your src folder
+      
       - name: Push Code (Verbose Debug)
         run: |
           echo "--- Content of src directory ---"
