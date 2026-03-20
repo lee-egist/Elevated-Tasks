@@ -39,6 +39,15 @@ jobs:
         run: |
           echo "{\"scriptId\":\"$TARGET_SCRIPT_ID\",\"rootDir\":\"src\"}" > .clasp.json
 
+      - name: Verify Secret Match
+        run: |
+          if [ "${{ secrets.DEV_SCRIPT_ID }}" == "${{ secrets.EXPECTED_ID }}" ]; then
+            echo "✅ SUCCESS: GitHub is pushing to the correct Script ID."
+          else
+            echo "❌ ERROR: GitHub is pushing to a DIFFERENT Script ID than your browser project."
+            echo "The Secret in GitHub does not match the project you are looking at."
+          fi
+          
       - name: Push Code
         run: clasp push -f
 
