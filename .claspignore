@@ -1,6 +1,0 @@
-# Ignore everything in the repository root
-**/**
-
-# Exceptions: Allow the manifest and the source folder
-!src/**
-!appsscript.json
