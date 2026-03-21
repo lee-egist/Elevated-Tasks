@@ -65,5 +65,4 @@ jobs:
 
       - name: Deploy to Production
         if: env.IS_PROD == 'true'
-        # New version (correct syntax)
         run: clasp deploy -i ${{ secrets.PROD_DEPLOYMENT_ID }} -d "Prod Release: ${{ github.sha }}"
