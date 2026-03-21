@@ -1,68 +1,36 @@
-name: Multi-Env Deploy
-
-on:
-  push:
-    branches: [main, develop]
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout Repo
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '20'
 
-      - name: Install Clasp
-        run: npm install -g @google/clasp
+      - name: Install Dependencies
+        run: npm install
 
-      - name: Create clasp auth file
+      - name: Create Clasp Config
+        run: |
+          cat <<EOF > .clasp.json
+          {"scriptId":"${{ secrets.CLASP_SCRIPT_ID }}","rootDir":"src"}
+          EOF
+
+      - name: Create Clasp Auth
         run: |
           cat <<EOF > ~/.clasprc.json
           ${{ secrets.CLASPRC_JSON }}
           EOF
 
-      - name: Set Environment Variables
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "TARGET_SCRIPT_ID=${{ secrets.PROD_SCRIPT_ID }}" >> $GITHUB_ENV
-            echo "IS_PROD=true" >> $GITHUB_ENV
-          else
-            echo "TARGET_SCRIPT_ID=${{ secrets.DEV_SCRIPT_ID }}" >> $GITHUB_ENV
-            echo "IS_PROD=false" >> $GITHUB_ENV
-          fi
-
-      - name: Configure .clasp.json
-        run: |
-          echo "{\"scriptId\":\"$TARGET_SCRIPT_ID\",\"rootDir\":\"src\"}" > .clasp.json
-
-      - name: Verify Secret Match
-        run: |
-          if [ "${{ secrets.DEV_SCRIPT_ID }}" == "${{ secrets.EXPECTED_ID }}" ]; then
-            echo "✅ SUCCESS: GitHub is pushing to the correct Script ID."
-          else
-            echo "❌ ERROR: GitHub is pushing to a DIFFERENT Script ID than your browser project."
-            echo "The Secret in GitHub does not match the project you are looking at."
-          fi
-
-      - name: Install Dependencies
-        run: npm install
-
       - name: Run Linter
-        run: npx eslint src/  # This scans everything in your src folder
-      
-      - name: Push Code (Verbose Debug)
-        run: |
-          echo "--- Content of src directory ---"
-          ls -a src/
-          echo "--- Checking appsscript.json existence ---"
-          if [ -f src/appsscript.json ]; then echo "Found manifest"; else echo "MANIFEST MISSING IN SRC"; fi
-          echo "--- Running Clasp Push ---"
-          clasp push -f
+        run: npx eslint src/
+
+      - name: Push to Google
+        run: clasp push -f
 
       - name: Deploy to Production
-        if: env.IS_PROD == 'true'
-        run: clasp deploy -i ${{ secrets.PROD_DEPLOYMENT_ID }} -d "Prod Release: ${{ github.sha }}"
+        if: github.ref == 'refs/heads/main'
+        run: clasp deploy -i "${{ secrets.PROD_DEPLOYMENT_ID }}" -d "Prod Release:${{ github.sha }}"
