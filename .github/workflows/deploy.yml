@@ -1,3 +1,11 @@
+name: Deploy to Google Apps Script
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
