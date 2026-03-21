@@ -49,7 +49,7 @@ export default [
       }],  // Highlights variables you defined but didn't use
       "no-undef": "error",        // Stops the build if you use an unknown variable (typo)
       "no-extra-semi": "error",   // Keeps the code clean from double semicolons
-      "no-redeclare": "off"
+      "no-redeclare": "off",
     },
   },
 ]; 
