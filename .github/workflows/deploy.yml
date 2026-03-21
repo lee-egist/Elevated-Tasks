@@ -21,6 +21,9 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      - name: Install Clasp Globally
+        run: npm install -g @google/clasp
+
       - name: Create Clasp Config
         run: |
           cat <<EOF > .clasp.json
