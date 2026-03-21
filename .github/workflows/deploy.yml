@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24' # Using the latest Node 24 environment
 
       - name: Install Dependencies
         run: npm install
@@ -24,10 +24,21 @@ jobs:
       - name: Install Clasp Globally
         run: npm install -g @google/clasp
 
+      - name: Set Target Script ID
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "TARGET_SCRIPT_ID=${{ secrets.PROD_SCRIPT_ID }}" >> $GITHUB_ENV
+          else
+            echo "TARGET_SCRIPT_ID=${{ secrets.DEV_SCRIPT_ID }}" >> $GITHUB_ENV
+          fi
+
       - name: Create Clasp Config
         run: |
           cat <<EOF > .clasp.json
-          {"scriptId":"${{ secrets.CLASP_SCRIPT_ID }}","rootDir":"src"}
+          {
+            "scriptId": "${{ env.TARGET_SCRIPT_ID }}",
+            "rootDir": "src"
+          }
           EOF
 
       - name: Create Clasp Auth
