@@ -66,6 +66,27 @@ function fetchAndLinkTasks(taskListId = "all_lists") {
   return rootTasks; // Returns an array of parent tasks, with subtasks neatly tucked inside
 }
 
+/**
+ * Creates a new task in the user's default task list.
+ * @param {string} title - The visible title of the task.
+ * @param {string} notes - Optional hidden metadata string.
+ * @returns {Object} The created Task object.
+ */
+function createTask(title, notes = "") {
+  try {
+    const newTask = {
+      title: title,
+      notes: notes
+    };
+    // Insert the task using the Advanced Tasks Service
+    const createdTask = Tasks.Tasks.insert(newTask, "@default");
+    return createdTask;
+  } catch (error) {
+    console.error("Error creating task:", error);
+    throw new Error("Failed to create task: " + error.message, { cause: error });
+  }
+}
+
 function getTask(taskListId, taskId) {
   return Tasks.Tasks.get(taskListId, taskId);
 }
@@ -79,6 +100,21 @@ function updateTaskData(taskListId, taskId, newTitle, newNotes) {
   task.title = newTitle;
   task.notes = newNotes;
   return Tasks.Tasks.update(task, taskListId, taskId);
+}
+
+/**
+ * Deletes a task from the user's default list.
+ * @param {string} taskId - The unique ID of the task.
+ * @returns {boolean} True if successful.
+ */
+function deleteTask(taskId) {
+  try {
+    Tasks.Tasks.remove("@default", taskId);
+    return true;
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    throw new Error("Failed to delete task: " + error.message, { cause: error });
+  }
 }
 
 function fetchExistingProjects(taskListId = "@default") {
