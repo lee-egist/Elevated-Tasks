@@ -291,6 +291,14 @@
       </div>
     </div>
 
+    <div class="add-task-container">
+      <input type="text" id="newTaskInput" placeholder="What needs to be done?">
+      <button id="addTaskBtn" onclick="handleCreateTask()">Add Task</button>
+    </div>
+
+    <ul id="task-list-container">
+      </ul>
+
     <script>
       let currentTasks = [];
       let currentView = 'board'; // Default View
@@ -738,6 +746,82 @@
         btn.disabled = false;
         text.innerText = "Save Changes";
         spinner.classList.add('hidden');
+      }
+
+      /**
+      * Handles creating a new task from the input field
+      */
+      function handleCreateTask() {
+        const inputEl = document.getElementById('newTaskInput');
+        const btnEl = document.getElementById('addTaskBtn');
+        const title = inputEl.value.trim();
+        
+        if (!title) return; // Don't create empty tasks
+
+        // 1. Lock the UI so they don't spam the button
+        inputEl.disabled = true;
+        btnEl.innerText = "Adding...";
+
+        // 2. Call the Engine Backend
+        google.script.run
+          .withSuccessHandler(function(newTask) {
+            // Unlock UI and clear input
+            inputEl.value = '';
+            inputEl.disabled = false;
+            btnEl.innerText = "Add Task";
+            
+            // Add the new task to the screen (assuming you have a render function)
+            renderSingleTaskToScreen(newTask); 
+          })
+          .withFailureHandler(function(error) {
+            alert("Uh oh! " + error.message);
+            inputEl.disabled = false;
+            btnEl.innerText = "Add Task";
+          })
+          .createTask(title, '{"status": "new"}'); // Injecting some default hidden metadata!
+        }
+
+      /**
+      * Handles deleting a task with an "Optimistic UI" instant hide
+      */
+      function handleDeleteTask(taskId, listItemElementId) {
+        const listItem = document.getElementById(listItemElementId);
+        
+        // 1. Optimistic UI: Instantly hide it from the user so it feels fast
+        if (listItem) {
+          listItem.style.opacity = '0.3'; // Grey it out immediately
+          listItem.style.pointerEvents = 'none'; // Prevent double-clicks
+        }
+
+        // 2. Tell Google to delete it in the background
+        google.script.run
+          .withSuccessHandler(function() {
+            // Once confirmed by server, remove it completely
+            if (listItem) listItem.remove();
+          })
+          .withFailureHandler(function(error) {
+            // If it fails, bring it back and warn the user
+            alert("Failed to delete: " + error.message);
+            if (listItem) {
+              listItem.style.opacity = '1';
+              listItem.style.pointerEvents = 'auto';
+            }
+          })
+          .deleteTask(taskId);
+        }
+      
+      // Example render function to build the HTML for a single task
+      function renderSingleTaskToScreen(task) {
+        const ul = document.getElementById('task-list-container');
+        const liId = 'task-' + task.id;
+        
+        const li = document.createElement('li');
+        li.id = liId;
+        li.innerHTML = `
+          <span>${task.title}</span>
+          <button onclick="handleDeleteTask('${task.id}', '${liId}')">🗑️ Delete</button>
+        `;
+        ul.prepend(li); // Add to the top of the list
       }
     </script>
   </body>

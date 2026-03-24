@@ -97,3 +97,39 @@ function fetchExistingProjects(taskListId = "@default") {
   
   return Array.from(projects).sort();
 }
+
+/**
+ * Creates a new task in the user's default task list.
+ * @param {string} title - The visible title of the task.
+ * @param {string} notes - Optional hidden metadata string.
+ * @returns {Object} The created Task object.
+ */
+function createTask(title, notes = "") {
+  try {
+    const newTask = {
+      title: title,
+      notes: notes
+    };
+    // Insert the task using the Advanced Tasks Service
+    const createdTask = Tasks.Tasks.insert(newTask, "@default");
+    return createdTask;
+  } catch (error) {
+    console.error("Error creating task:", error);
+    throw new Error("Failed to create task: " + error.message, { cause: error });
+  }
+}
+
+/**
+ * Deletes a task from the user's default list.
+ * @param {string} taskId - The unique ID of the task.
+ * @returns {boolean} True if successful.
+ */
+function deleteTask(taskId) {
+  try {
+    Tasks.Tasks.remove("@default", taskId);
+    return true;
+  } catch (error) {
+    console.error("Error deleting task:", error);
+    throw new Error("Failed to delete task: " + error.message, { cause: error });
+  }
+}
