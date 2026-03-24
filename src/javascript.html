@@ -448,78 +448,53 @@
       }
 
       /**
-      * Handles creating a new task from the input field
+      * Triggers when the "+ Add Task" button is clicked
       */
-      function handleCreateTask() {
-        const inputEl = document.getElementById('newTaskInput');
+      function triggerAddTask() {
+        const title = prompt("Enter the new task title:");
+        if (!title || title.trim() === "") return;
+
         const btnEl = document.getElementById('addTaskBtn');
-        const title = inputEl.value.trim();
-        
-        if (!title) return; // Don't create empty tasks
-
-        // 1. Lock the UI so they don't spam the button
-        inputEl.disabled = true;
         btnEl.innerText = "Adding...";
+        btnEl.disabled = true;
 
-        // 2. Call the Engine Backend
         google.script.run
           .withSuccessHandler(function(newTask) {
-            // Unlock UI and clear input
-            inputEl.value = '';
-            inputEl.disabled = false;
-            btnEl.innerText = "Add Task";
-            
-            // Add the new task to the screen (assuming you have a render function)
-            renderSingleTaskToScreen(newTask); 
+            btnEl.innerText = "+ Add Task";
+            btnEl.disabled = false;
+            // Instantly reload tasks to show the new one in the right column
+            loadTasks(); 
           })
           .withFailureHandler(function(error) {
-            alert("Uh oh! " + error.message);
-            inputEl.disabled = false;
-            btnEl.innerText = "Add Task";
+            alert("Failed to create task: " + error.message);
+            btnEl.innerText = "+ Add Task";
+            btnEl.disabled = false;
           })
-          .createTask(title, '{"status": "new"}'); // Injecting some default hidden metadata!
-        }
+          .createTask(title.trim(), '{"status": "open"}');
+      }
 
       /**
-      * Handles deleting a task with an "Optimistic UI" instant hide
+      * Handles deleting the task while the Edit Modal is open
       */
-      function handleDeleteTask(taskId, listItemElementId) {
-        const listItem = document.getElementById(listItemElementId);
-        
-        // 1. Optimistic UI: Instantly hide it from the user so it feels fast
-        if (listItem) {
-          listItem.style.opacity = '0.3'; // Grey it out immediately
-          listItem.style.pointerEvents = 'none'; // Prevent double-clicks
-        }
+      function handleDeleteFromModal() {
+        const taskId = document.getElementById('edit-taskId').value;
+        if (!taskId) return;
 
-        // 2. Tell Google to delete it in the background
+        const confirmDelete = confirm("Are you sure you want to permanently delete this task?");
+        if (!confirmDelete) return;
+
+        // Optimistic UI: Close modal and remove from DOM immediately
+        closeEditModal();
+        const cardElement = document.getElementById('task-' + taskId);
+        if (cardElement) cardElement.remove();
+
+        // Tell server to delete
         google.script.run
-          .withSuccessHandler(function() {
-            // Once confirmed by server, remove it completely
-            if (listItem) listItem.remove();
-          })
           .withFailureHandler(function(error) {
-            // If it fails, bring it back and warn the user
-            alert("Failed to delete: " + error.message);
-            if (listItem) {
-              listItem.style.opacity = '1';
-              listItem.style.pointerEvents = 'auto';
-            }
-          })
+            alert("Server failed to delete task: " + error.message);
+            loadTasks(); // Reload to restore the UI if delete failed
+        })
           .deleteTask(taskId);
-        }
-      
-      // Example render function to build the HTML for a single task
-      function renderSingleTaskToScreen(task) {
-        const ul = document.getElementById('task-list-container');
-        const liId = 'task-' + task.id;
-        
-        const li = document.createElement('li');
-        li.id = liId;
-        li.innerHTML = `
-          <span>${task.title}</span>
-          <button onclick="handleDeleteTask('${task.id}', '${liId}')">🗑️ Delete</button>
-        `;
-        ul.prepend(li); // Add to the top of the list
       }
+      
     </script>
