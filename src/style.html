@@ -1,0 +1,74 @@
+<style>
+      body { background-color: #f3f4f6; }
+      .kanban-column { 
+        min-height: 300px;
+        transition: background-color 0.2s ease;
+      }
+      
+      .top-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        align-items: center;
+      }
+      
+      .search-input {
+        flex-grow: 1; /* Makes the search bar take up the remaining space */
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+
+      .primary-btn {
+        background-color: #0b57d0;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+      }
+
+      .primary-btn:hover {
+        background-color: #0842a0;
+      }
+
+      .detail-view {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+        position: relative; /* Allows us to absolutely position the trash can */
+      }
+
+      .delete-icon-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        opacity: 0.6;
+        transition: opacity 0.2s, transform 0.2s;
+      }
+
+      .delete-icon-btn:hover {
+        opacity: 1;
+        transform: scale(1.1);
+        color: red;
+      }
+
+      .kanban-column.drag-over { background-color: rgba(0,0,0,0.05); }
+      .task-card { 
+        cursor: grab; 
+        transition: transform 0.1s ease, box-shadow 0.1s ease;
+      }
+      .task-card:active { cursor: grabbing; transform: scale(1.02); }
+      .task-card.dragging { opacity: 0.5; }
+      
+      /* Modal & general scrollbar styling */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>

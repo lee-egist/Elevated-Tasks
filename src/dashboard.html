@@ -38,6 +38,33 @@
       .primary-btn:hover {
         background-color: #0842a0;
       }
+
+      .detail-view {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+        position: relative; /* Allows us to absolutely position the trash can */
+      }
+
+      .delete-icon-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        opacity: 0.6;
+        transition: opacity 0.2s, transform 0.2s;
+      }
+
+      .delete-icon-btn:hover {
+        opacity: 1;
+        transform: scale(1.1);
+        color: red;
+      }
+
       .kanban-column.drag-over { background-color: rgba(0,0,0,0.05); }
       .task-card { 
         cursor: grab; 
@@ -303,7 +330,11 @@
               <input type="text" id="edit-blocked-by" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
             </div>
           </div>
-
+          <div id="task-detail-view" class="detail-view" style="display: none;">
+            <button id="deleteTaskBtn" class="delete-icon-btn" title="Delete Task">🗑️</button>
+            <h2 id="detail-title">Task Title</h2>
+            <p id="detail-notes">Task metadata and notes will go here...</p>
+          </div>
           <!-- Modal Footer -->
           <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
             <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors shadow-sm">
