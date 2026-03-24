@@ -503,24 +503,63 @@
       /**
       * Handles deleting the task while the Edit Modal is open
       */
+// Keep track of which task is about to be deleted
+      let taskPendingDeletion = null;
+
+      /**
+       * Triggered from the trash icon in the Edit Modal.
+       * Opens the custom Delete Confirmation Modal.
+       */
       function handleDeleteFromModal() {
         const taskId = document.getElementById('edit-taskId').value;
         if (!taskId) return;
+        
+        // Save the ID and show the modal
+        taskPendingDeletion = taskId;
+        document.getElementById('deleteModal').style.display = 'flex';
+      }
 
-        const confirmDelete = confirm("Are you sure you want to permanently delete this task?");
-        if (!confirmDelete) return;
+      /**
+       * Closes the Delete Confirmation Modal
+       */
+      function closeDeleteModal() {
+        taskPendingDeletion = null;
+        document.getElementById('deleteModal').style.display = 'none';
+        
+        // Reset the button text/state just in case it was stuck loading
+        const btn = document.getElementById('confirmDeleteBtn');
+        if (btn) {
+          btn.innerText = 'Yes, Delete';
+          btn.disabled = false;
+        }
+      }
 
-        // Optimistic UI: Close modal and remove from DOM immediately
-        closeEditModal();
+      /**
+       * Actually executes the deletion when the red button is clicked
+       */
+      function executeDeleteTask() {
+        if (!taskPendingDeletion) return;
+        
+        const taskId = taskPendingDeletion;
+        const btn = document.getElementById('confirmDeleteBtn');
+        
+        // Lock UI
+        btn.innerText = "Deleting...";
+        btn.disabled = true;
+
+        // Optimistic UI: Instantly close BOTH modals and remove the task from the screen
+        closeDeleteModal();
+        closeEditModal(); 
+        
         const cardElement = document.getElementById('task-' + taskId);
         if (cardElement) cardElement.remove();
 
-        // Tell server to delete
+        // Tell the server to delete it in the background
         google.script.run
           .withFailureHandler(function(error) {
             alert("Server failed to delete task: " + error.message);
-            loadTasks(); // Reload to restore the UI if delete failed
-        })
+            loadTasks(); // Reload the UI to bring the task back if it failed
+          })
           .deleteTask(taskId);
       }
 
