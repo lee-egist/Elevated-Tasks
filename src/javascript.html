@@ -1,0 +1,566 @@
+<script>
+      let currentTasks = [];
+      let currentView = 'board'; // Default View
+
+      // Priority mapping for sorting
+      const priorityWeights = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1, '': 0 };
+
+      // Initial Load
+      window.onload = loadTasks;
+
+      function clearFilters() {
+        document.getElementById('filter-search').value = '';
+        document.getElementById('filter-status').value = 'all';
+        document.getElementById('filter-priority').value = 'all';
+        document.getElementById('filter-project').value = 'all';
+        document.getElementById('sort-by').value = 'default';
+        applyFiltersAndSort();
+      }
+
+      function populateProjectFilter(tasks) {
+        const projectSelect = document.getElementById('filter-project');
+        const currentSelection = projectSelect.value;
+        
+        // Extract unique, non-empty projects and sort them alphabetically
+        const projects = [...new Set(tasks.map(t => (t.project || '').trim()).filter(p => p !== ''))].sort();
+        
+        let optionsHtml = '<option value="all">All Projects</option>';
+        optionsHtml += '<option value="unassigned">No Project</option>';
+        
+        projects.forEach(p => {
+          optionsHtml += `<option value="${p}">${p}</option>`;
+        });
+        
+        projectSelect.innerHTML = optionsHtml;
+        
+        // Restore previous selection if it's still valid
+        if (currentSelection === 'unassigned' || projects.includes(currentSelection)) {
+          projectSelect.value = currentSelection;
+        }
+      }
+
+      // --- Filter and Sort Logic ---
+      function applyFiltersAndSort() {
+        if (!currentTasks || currentTasks.length === 0) return;
+
+        const searchText = document.getElementById('filter-search').value.toLowerCase();
+        const statusFilter = document.getElementById('filter-status').value;
+        const priorityFilter = document.getElementById('filter-priority').value;
+        const projectFilter = document.getElementById('filter-project').value;
+        const sortBy = document.getElementById('sort-by').value;
+
+        // 1. Filter
+        let processedTasks = currentTasks.filter(task => {
+          // Status
+          if (statusFilter !== 'all' && task.status !== statusFilter) return false;
+          
+          // Priority
+          if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
+          
+          // Project
+          const taskProject = (task.project || '').trim();
+          if (projectFilter !== 'all') {
+            if (projectFilter === 'unassigned' && taskProject !== '') return false;
+            if (projectFilter !== 'unassigned' && taskProject !== projectFilter) return false;
+          }
+
+          // Search (checks title, description, assignee, project)
+          if (searchText) {
+            const matchesTitle = (task.title || '').toLowerCase().includes(searchText);
+            const matchesDesc = (task.description || '').toLowerCase().includes(searchText);
+            const matchesAssignee = (task.assignee || '').toLowerCase().includes(searchText);
+            const matchesProject = taskProject.toLowerCase().includes(searchText);
+            if (!matchesTitle && !matchesDesc && !matchesAssignee && !matchesProject) return false;
+          }
+          return true;
+        });
+
+        // 2. Sort
+        processedTasks.sort((a, b) => {
+          switch (sortBy) {
+            case 'dueDateAsc':
+              if (!a.due_date) return 1;
+              if (!b.due_date) return -1;
+              return new Date(a.due_date) - new Date(b.due_date);
+            case 'dueDateDesc':
+              if (!a.due_date) return 1;
+              if (!b.due_date) return -1;
+              return new Date(b.due_date) - new Date(a.due_date);
+            case 'priorityDesc':
+              return (priorityWeights[b.priority || ''] || 0) - (priorityWeights[a.priority || ''] || 0);
+            case 'priorityAsc':
+              return (priorityWeights[a.priority || ''] || 0) - (priorityWeights[b.priority || ''] || 0);
+            case 'titleAsc':
+              return (a.title || '').localeCompare(b.title || '');
+            case 'projectAsc':
+              return (a.project || '').localeCompare(b.project || '');
+            default:
+              return 0; // Maintain original order
+          }
+        });
+
+        // 3. Render state check
+        document.getElementById('no-results').classList.add('hidden');
+        if (processedTasks.length === 0) {
+          document.getElementById('board').classList.add('hidden');
+          document.getElementById('table-view').classList.add('hidden');
+          document.getElementById('no-results').classList.remove('hidden');
+        } else {
+          renderBoard(processedTasks);
+          renderTable(processedTasks);
+          switchView(currentView); // ensure correct view is shown
+        }
+      }
+
+      // --- View Toggle Logic ---
+      function switchView(view) {
+        currentView = view;
+        const btnBoard = document.getElementById('btn-view-board');
+        const btnTable = document.getElementById('btn-view-table');
+        const boardContainer = document.getElementById('board');
+        const tableContainer = document.getElementById('table-view');
+        const noResults = !document.getElementById('no-results').classList.contains('hidden');
+
+        if (view === 'board') {
+          btnBoard.className = "px-3 py-1.5 bg-white shadow-sm rounded-md text-sm font-medium text-gray-800 transition-colors";
+          btnTable.className = "px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-md text-sm font-medium transition-colors";
+          if (!noResults) {
+            boardContainer.classList.remove('hidden');
+            tableContainer.classList.add('hidden');
+          }
+        } else {
+          btnTable.className = "px-3 py-1.5 bg-white shadow-sm rounded-md text-sm font-medium text-gray-800 transition-colors";
+          btnBoard.className = "px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-md text-sm font-medium transition-colors";
+          if (!noResults) {
+            tableContainer.classList.remove('hidden');
+            boardContainer.classList.add('hidden');
+          }
+        }
+      }
+
+      function loadTasks() {
+        document.getElementById('board').classList.add('hidden');
+        document.getElementById('table-view').classList.add('hidden');
+        document.getElementById('no-results').classList.add('hidden');
+        document.getElementById('loading').classList.remove('hidden');
+        
+        google.script.run
+          .withSuccessHandler(receiveData)
+          .withFailureHandler(showError)
+          .getDashboardData();
+      }
+
+      function receiveData(tasks) {
+        currentTasks = tasks;
+        document.getElementById('loading').classList.add('hidden');
+        
+        // Dynamically populate the project dropdown
+        populateProjectFilter(tasks); 
+        
+        applyFiltersAndSort(); // This handles rendering and showing the correct view
+      }
+
+      // --- Render Kanban Board ---
+      function renderBoard(tasksToRender) {
+        // Reset columns
+        const statuses = ['open', 'in_progress', 'blocked', 'completed'];
+        statuses.forEach(status => {
+          const col = document.getElementById(`col-${status}`);
+          if(col) col.innerHTML = '';
+          const count = document.getElementById(`count-${status}`);
+          if(count) count.innerText = '0';
+        });
+
+        const counts = { open: 0, in_progress: 0, blocked: 0, completed: 0 };
+
+        tasksToRender.forEach(task => {
+          const card = document.createElement('div');
+          card.className = "task-card bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md group relative";
+          card.draggable = true;
+          card.id = `task-${task.id}`;
+          card.dataset.taskId = task.id;
+          card.dataset.taskListId = task.taskListId;
+          card.ondragstart = dragStart;
+          card.ondragend = dragEnd;
+          
+          const dueDateDisplay = task.due_date ? new Date(task.due_date).toLocaleDateString() : '';
+          const typeDisplay = task.type ? task.type.charAt(0).toUpperCase() + task.type.slice(1) : 'General';
+          
+          // --- NEW: Check if it's a subtask and add the arrow ---
+          const isSubtask = !!task.parent;
+          const titlePrefix = isSubtask ? '<span class="text-gray-400 font-bold mr-1">↳</span>' : '';
+          
+          // Optional: You can also add a left-margin to the whole card if you want Kanban cards indented!
+          if (isSubtask) {
+            card.classList.add('ml-6', 'border-l-4', 'border-l-blue-300');
+          }
+          // -----------------------------------------------------
+
+          card.innerHTML = `
+            <div class="flex justify-between items-start mb-1 gap-2">
+              <div class="font-medium text-gray-900 leading-tight">${titlePrefix}${task.title}</div>
+              <button onclick="openEditModal('${task.id}')" class="text-gray-400 hover:text-blue-600 transition-colors p-1 -mt-1 -mr-1 rounded hover:bg-blue-50 opacity-0 group-hover:opacity-100" title="Edit Task">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+              </button>
+            </div>
+            <div class="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+              ${task.project || 'No Project'} &bull; ${typeDisplay}
+            </div>
+            ${task.due_date || task.blocked_by ? `
+            <div class="text-xs text-gray-500 mb-3 space-y-1 bg-gray-50 p-2 rounded border border-gray-100">
+              ${task.due_date ? `<div class="flex items-center gap-1"><span title="Due Date">📅</span> Due: ${dueDateDisplay}</div>` : ''}
+              ${task.blocked_by ? `<div class="flex items-center gap-1 text-red-500 font-medium"><span title="Blocked By">🚫</span> Blocked by: ${task.blocked_by}</div>` : ''}
+            </div>
+            ` : '<div class="mb-3"></div>'}
+            <div class="flex justify-between items-end text-xs">
+              <div class="flex flex-col gap-1">
+                <span class="text-gray-400">Assignee:</span>
+                <span class="px-2 py-1 bg-gray-100 rounded text-gray-700 truncate max-w-[120px]" title="${task.assignee || 'Unassigned'}">${task.assignee || 'Unassigned'}</span>
+              </div>
+              <span class="${getPriorityStyle(task.priority)} px-2 py-1 rounded-md font-semibold capitalize border">${task.priority || 'None'}</span>
+            </div>
+          `;
+          
+          // ... (keep the rest of the column sorting logic the same)
+          let colId = `col-${task.status}`;
+          let targetCol = document.getElementById(colId);
+          
+          if (!targetCol) {
+            targetCol = document.getElementById('col-open');
+            counts.open++;
+          } else {
+             counts[task.status]++;
+          }
+          
+          if(targetCol) targetCol.appendChild(card);
+        });
+
+        // Update counts
+        statuses.forEach(status => {
+          const countEl = document.getElementById(`count-${status}`);
+          if(countEl) countEl.innerText = counts[status];
+        });
+      }
+
+      // --- Render Table View ---
+      function renderTable(tasksToRender) {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+        
+        tasksToRender.forEach(task => {
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-gray-50 transition-colors";
+          
+          const dueDateDisplay = task.due_date ? new Date(task.due_date).toLocaleDateString() : '-';
+          const typeDisplay = task.type ? task.type.charAt(0).toUpperCase() + task.type.slice(1) : 'General';
+          
+          let statusDisplay = 'Open';
+          if (task.status === 'in_progress') statusDisplay = 'In Progress';
+          if (task.status === 'blocked') statusDisplay = 'Blocked';
+          if (task.status === 'completed') statusDisplay = 'Completed';
+
+          // --- NEW: Check for parent to add the indent arrow in the table ---
+          const isSubtask = !!task.parent;
+          const titlePrefix = isSubtask ? '<span class="text-gray-400 font-bold mr-2 ml-6">↳</span>' : '';
+          // ------------------------------------------------------------------
+          
+          tr.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="font-medium text-gray-900">${titlePrefix}${task.title}</div>
+              <div class="text-xs text-gray-500 ${isSubtask ? 'ml-10' : ''}">${typeDisplay}</div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2 py-1 text-xs rounded-full font-medium ${getTableStatusStyle(task.status)}">${statusDisplay}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.project || '-'}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.assignee || '-'}</td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="${getPriorityStyle(task.priority)} px-2 py-1 rounded-md text-xs font-semibold capitalize border">${task.priority || 'None'}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${dueDateDisplay}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+              <button onclick="openEditModal('${task.id}')" class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded transition-colors shadow-sm border border-blue-100">Edit</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      function getPriorityStyle(priority) {
+        switch(priority) {
+          case 'high': case 'critical': return 'bg-red-50 text-red-700 border-red-200';
+          case 'medium': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+          case 'low': return 'bg-blue-50 text-blue-700 border-blue-200';
+          default: return 'bg-gray-50 text-gray-500 border-gray-200';
+        }
+      }
+
+      function getTableStatusStyle(status) {
+        switch(status) {
+          case 'completed': return 'bg-green-100 text-green-800';
+          case 'blocked': return 'bg-red-100 text-red-800';
+          case 'in_progress': return 'bg-blue-100 text-blue-800';
+          default: return 'bg-gray-200 text-gray-800';
+        }
+      }
+
+      function showError(err) {
+        document.getElementById('loading').innerHTML = `
+          <div class="text-red-600 bg-red-50 p-4 rounded-lg border border-red-200 shadow-sm max-w-md mx-auto text-center">
+            <strong class="block mb-2 text-lg">Error loading tasks</strong>
+            <span>${err.message}</span>
+          </div>
+        `;
+      }
+
+      // --- Drag and Drop Logic ---
+      function dragStart(ev) {
+        ev.dataTransfer.setData("taskId", ev.target.dataset.taskId);
+        ev.dataTransfer.setData("taskListId", ev.target.dataset.taskListId);
+        ev.dataTransfer.effectAllowed = "move";
+        setTimeout(() => ev.target.classList.add('dragging'), 0);
+      }
+
+      function dragEnd(ev) {
+        ev.target.classList.remove('dragging');
+      }
+
+      function allowDrop(ev) {
+        ev.preventDefault();
+        const column = ev.target.closest('.kanban-column');
+        if (column) column.classList.add('drag-over');
+      }
+
+      function dragLeave(ev) {
+        const column = ev.target.closest('.kanban-column');
+        if (column) column.classList.remove('drag-over');
+      }
+
+      function drop(ev, newStatus) {
+        ev.preventDefault();
+        
+        const column = ev.target.closest('.kanban-column');
+        if (column) column.classList.remove('drag-over');
+
+        const taskId = ev.dataTransfer.getData("taskId");
+        const taskListId = ev.dataTransfer.getData("taskListId");
+        
+        // Find task in global array and update it locally
+        const taskObjIndex = currentTasks.findIndex(t => t.id === taskId);
+        if (taskObjIndex > -1) {
+          currentTasks[taskObjIndex].status = newStatus;
+          
+          // Reapply filters and rendering. 
+          // Note: if the new status violates the active filter, the card will disappear from view (expected behavior)
+          applyFiltersAndSort(); 
+
+          // Sync back to Google Tasks asynchronously
+          google.script.run.updateDashboardTaskStatus(taskId, taskListId, newStatus);
+        }
+      }
+
+      // --- Edit Modal Logic ---
+      function openEditModal(taskId) {
+        const task = currentTasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const formatDateForInput = (dateString) => {
+          if (!dateString) return '';
+          const d = new Date(dateString);
+          if (isNaN(d.getTime())) return '';
+          return d.toISOString().split('T')[0];
+        };
+
+        document.getElementById('edit-taskId').value = task.id;
+        document.getElementById('edit-taskListId').value = task.taskListId;
+        document.getElementById('edit-status').value = task.status; 
+        
+        document.getElementById('edit-title').value = task.title || '';
+        document.getElementById('edit-description').value = task.description || '';
+        document.getElementById('edit-project').value = task.project || '';
+        document.getElementById('edit-assignee').value = task.assignee || '';
+        document.getElementById('edit-priority').value = task.priority || 'medium';
+        document.getElementById('edit-type').value = task.type || 'general';
+        document.getElementById('edit-start-date').value = formatDateForInput(task.start_date);
+        document.getElementById('edit-due-date').value = formatDateForInput(task.due_date);
+        document.getElementById('edit-blocked-by').value = task.blocked_by || '';
+
+        document.getElementById('editModal').classList.remove('hidden');
+      }
+
+      function closeEditModal() {
+        document.getElementById('editModal').classList.add('hidden');
+      }
+
+      function saveTaskEdit(ev) {
+        ev.preventDefault();
+        
+        const btn = document.getElementById('saveBtn');
+        const text = document.getElementById('saveText');
+        const spinner = document.getElementById('saveSpinner');
+        
+        btn.disabled = true;
+        text.innerText = "Saving...";
+        spinner.classList.remove('hidden');
+
+        const taskId = document.getElementById('edit-taskId').value;
+        const taskListId = document.getElementById('edit-taskListId').value;
+        const updatedData = {
+          title: document.getElementById('edit-title').value,
+          description: document.getElementById('edit-description').value,
+          project: document.getElementById('edit-project').value,
+          assignee: document.getElementById('edit-assignee').value,
+          priority: document.getElementById('edit-priority').value,
+          status: document.getElementById('edit-status').value,
+          type: document.getElementById('edit-type').value,
+          start_date: document.getElementById('edit-start-date').value,
+          due_date: document.getElementById('edit-due-date').value,
+          blocked_by: document.getElementById('edit-blocked-by').value
+        };
+
+        google.script.run
+          .withSuccessHandler(() => {
+            const taskIndex = currentTasks.findIndex(t => t.id === taskId);
+            if (taskIndex > -1) {
+              currentTasks[taskIndex] = { ...currentTasks[taskIndex], ...updatedData };
+            }
+            
+            // Re-populate the project dropdown just in case the edit introduced a new project
+            populateProjectFilter(currentTasks);
+            
+            // Maintain current filters and view state
+            applyFiltersAndSort();
+            closeEditModal();
+            resetSaveButton(btn, text, spinner);
+          })
+          .withFailureHandler((err) => {
+            alert("Error saving task: " + err.message);
+            resetSaveButton(btn, text, spinner);
+          })
+          .updateDashboardTaskDetails(taskId, taskListId, updatedData);
+      }
+
+      function resetSaveButton(btn, text, spinner) {
+        btn.disabled = false;
+        text.innerText = "Save Changes";
+        spinner.classList.add('hidden');
+      }
+
+      /**
+      * Triggers when the "+ Add Task" button is clicked
+      */
+/**
+       * Opens the custom Add Task Modal
+       */
+      function triggerAddTask() {
+        document.getElementById('add-title').value = ''; // Clear old input
+        document.getElementById('addModal').style.display = 'flex';
+        document.getElementById('add-title').focus(); // Auto-focus the input box
+      }
+
+      /**
+       * Closes the Add Task Modal
+       */
+      function closeAddModal() {
+        document.getElementById('addModal').style.display = 'none';
+      }
+
+      /**
+       * Submits the new task to the server
+       */
+      function submitNewTask(ev) {
+        ev.preventDefault(); // Stop the form from refreshing the page
+        
+        const titleInput = document.getElementById('add-title');
+        const btnEl = document.getElementById('submitAddBtn');
+        const title = titleInput.value.trim();
+        
+        if (!title) return;
+
+        // Lock UI while saving
+        btnEl.innerText = "Adding...";
+        btnEl.disabled = true;
+        titleInput.disabled = true;
+
+        google.script.run
+          .withSuccessHandler(function(newTask) {
+            // Unlock UI, close modal, and reload tasks
+            btnEl.innerText = "Add Task";
+            btnEl.disabled = false;
+            titleInput.disabled = false;
+            closeAddModal();
+            loadTasks(); 
+          })
+          .withFailureHandler(function(error) {
+            alert("Failed to create task: " + error.message);
+            btnEl.innerText = "Add Task";
+            btnEl.disabled = false;
+            titleInput.disabled = false;
+          })
+          .createTask(title, '{"status": "open"}');
+      }
+      /**
+      * Handles deleting the task while the Edit Modal is open
+      */
+// Keep track of which task is about to be deleted
+      let taskPendingDeletion = null;
+
+      /**
+       * Triggered from the trash icon in the Edit Modal.
+       * Opens the custom Delete Confirmation Modal.
+       */
+      function handleDeleteFromModal() {
+        const taskId = document.getElementById('edit-taskId').value;
+        if (!taskId) return;
+        
+        // Save the ID and show the modal
+        taskPendingDeletion = taskId;
+        document.getElementById('deleteModal').style.display = 'flex';
+      }
+
+      /**
+       * Closes the Delete Confirmation Modal
+       */
+      function closeDeleteModal() {
+        taskPendingDeletion = null;
+        document.getElementById('deleteModal').style.display = 'none';
+        
+        // Reset the button text/state just in case it was stuck loading
+        const btn = document.getElementById('confirmDeleteBtn');
+        if (btn) {
+          btn.innerText = 'Yes, Delete';
+          btn.disabled = false;
+        }
+      }
+
+      /**
+       * Actually executes the deletion when the red button is clicked
+       */
+      function executeDeleteTask() {
+        if (!taskPendingDeletion) return;
+        
+        const taskId = taskPendingDeletion;
+        const btn = document.getElementById('confirmDeleteBtn');
+        
+        // Lock UI
+        btn.innerText = "Deleting...";
+        btn.disabled = true;
+
+        // Optimistic UI: Instantly close BOTH modals and remove the task from the screen
+        closeDeleteModal();
+        closeEditModal(); 
+        
+        const cardElement = document.getElementById('task-' + taskId);
+        if (cardElement) cardElement.remove();
+
+        // Tell the server to delete it in the background
+        google.script.run
+          .withFailureHandler(function(error) {
+            alert("Server failed to delete task: " + error.message);
+            loadTasks(); // Reload the UI to bring the task back if it failed
+          })
+          .deleteTask(taskId);
+      }
+
+    </script>

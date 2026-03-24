@@ -52,3 +52,10 @@ function buildElevatedNotes(userNotes, metadataObj) {
   const safeNotes = userNotes || "";
   return safeNotes + CONFIG.FULL_MARKER + JSON.stringify(metadataObj, null, 2);
 }
+
+/**
+ * Helper function to include HTML/CSS/JS files inside other HTML files.
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}

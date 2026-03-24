@@ -4,8 +4,12 @@
  */
 
 function doGet(e) {
-  return HtmlService.createHtmlOutputFromFile('dashboard')
-      .setTitle('Task Elevator Dashboard')
+  // Use createTemplateFromFile instead of createHtmlOutputFromFile
+  const template = HtmlService.createTemplateFromFile('dashboard');
+
+  // Evaluate the template (which runs the 'include' functions) before returning
+  return template.evaluate()
+      .setTitle("Elevated Tasks Dashboard")
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
