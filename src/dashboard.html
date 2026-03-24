@@ -10,6 +10,34 @@
         min-height: 300px;
         transition: background-color 0.2s ease;
       }
+      
+      .top-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        align-items: center;
+      }
+      
+      .search-input {
+        flex-grow: 1; /* Makes the search bar take up the remaining space */
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+      }
+
+      .primary-btn {
+        background-color: #0b57d0;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+      }
+
+      .primary-btn:hover {
+        background-color: #0842a0;
+      }
       .kanban-column.drag-over { background-color: rgba(0,0,0,0.05); }
       .task-card { 
         cursor: grab; 
@@ -169,7 +197,10 @@
         </div>
 
       </div>
-
+      <div class="top-bar">
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search tasks...">
+        <button id="addTaskBtn" class="primary-btn" onclick="triggerAddTask()">+ Add Task</button>
+      </div>
       <!-- Table View -->
       <div id="table-view" class="hidden overflow-x-auto bg-white rounded-xl shadow-sm border border-gray-200">
         <table class="min-w-full divide-y divide-gray-200">
@@ -289,11 +320,6 @@
         </form>
 
       </div>
-    </div>
-
-    <div class="add-task-container">
-      <input type="text" id="newTaskInput" placeholder="What needs to be done?">
-      <button id="addTaskBtn" onclick="handleCreateTask()">Add Task</button>
     </div>
 
     <ul id="task-list-container">
