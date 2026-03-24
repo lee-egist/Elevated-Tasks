@@ -455,7 +455,7 @@
        */
       function triggerAddTask() {
         document.getElementById('add-title').value = ''; // Clear old input
-        document.getElementById('addModal').classList.remove('hidden');
+        document.getElementById('addModal').style.display = 'flex';
         document.getElementById('add-title').focus(); // Auto-focus the input box
       }
 
@@ -463,7 +463,7 @@
        * Closes the Add Task Modal
        */
       function closeAddModal() {
-        document.getElementById('addModal').classList.add('hidden');
+        document.getElementById('addModal').style.display = 'none';
       }
 
       /**
