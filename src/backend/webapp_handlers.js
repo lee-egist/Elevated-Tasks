@@ -5,7 +5,7 @@
 
 function doGet(e) {
   // Use createTemplateFromFile instead of createHtmlOutputFromFile
-  const template = HtmlService.createTemplateFromFile('dashboard');
+  const template = HtmlService.createTemplateFromFile('frontend/dashboard');
 
   // Evaluate the template (which runs the 'include' functions) before returning
   return template.evaluate()
