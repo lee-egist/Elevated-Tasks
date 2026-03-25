@@ -102,6 +102,6 @@ function createDashboardTask(taskListId, taskData) {
     return true;
   } catch (err) {
     console.error("Error creating Dashboard Task: " + err);
-    throw new Error("Failed to create task: " + err.message);
+    throw new Error("Failed to create task: " + err.message, { cause: err });
   }
 }
