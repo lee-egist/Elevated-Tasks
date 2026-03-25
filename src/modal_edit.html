@@ -1,0 +1,55 @@
+    <div id="editModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-60 overflow-y-auto h-full w-full flex items-center justify-center z-50 transition-opacity">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transform transition-all relative">
+        
+        <button id="deleteTaskBtn" onclick="handleDeleteFromModal()" class="absolute top-4 right-14 text-2xl opacity-60 hover:opacity-100 hover:text-red-600 transition-all" title="Delete Task">🗑️</button>
+
+        <div class="flex justify-between items-center p-5 border-b border-gray-200">
+          <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">Edit Task</h3>
+          <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-600 transition-colors text-2xl">✕</button>
+        </div>
+
+        <form id="editForm" onsubmit="saveTaskEdit(event)" class="p-5 max-h-[70vh] overflow-y-auto">
+          <input type="hidden" id="edit-taskId">
+          <input type="hidden" id="edit-taskListId">
+          <input type="hidden" id="edit-status">
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Task Title</label>
+              <input type="text" id="edit-title" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none" required>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-1">Description / Notes</label>
+              <textarea id="edit-description" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none" rows="3"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div><label class="block text-sm font-semibold text-gray-700 mb-1">Project</label><input type="text" id="edit-project" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none"></div>
+              <div><label class="block text-sm font-semibold text-gray-700 mb-1">Assignee</label><input type="text" id="edit-assignee" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Priority</label>
+                <select id="edit-priority" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none bg-white">
+                  <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">Task Type</label>
+                <select id="edit-type" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none bg-white">
+                  <option value="general">General</option><option value="bug">Bug</option><option value="feature">Feature</option><option value="milestone">Milestone</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div><label class="block text-sm font-semibold text-gray-700 mb-1">Start Date</label><input type="date" id="edit-start-date" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none"></div>
+              <div><label class="block text-sm font-semibold text-gray-700 mb-1">Due Date</label><input type="date" id="edit-due-date" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none"></div>
+            </div>
+            <div><label class="block text-sm font-semibold text-gray-700 mb-1">Blocked By (Task ID)</label><input type="text" id="edit-blocked-by" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none"></div>
+          </div>
+          <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
+            <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium">Cancel</button>
+            <button type="submit" id="saveBtn" class="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium"><span id="saveText">Save Changes</span></button>
+          </div>
+        </form>
+      </div>
+    </div>

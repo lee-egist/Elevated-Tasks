@@ -1,0 +1,48 @@
+<div id="addModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 overflow-y-auto h-full w-full items-center justify-center z-50 transition-opacity" style="display: none;">
+  <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 transform transition-all relative">
+    <div class="flex justify-between items-center p-5 border-b border-gray-200">
+      <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">Create New Task</h3>
+      <button onclick="closeAddModal()" class="text-gray-400 hover:text-gray-600 transition-colors text-2xl">✕</button>
+    </div>
+
+    <form id="addForm" onsubmit="submitNewTask(event)" class="p-5 max-h-[70vh] overflow-y-auto">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Task Title <span class="text-red-500">*</span></label>
+          <input type="text" id="add-title" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none focus:ring-2 focus:ring-blue-500" required autofocus>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Description / Notes</label>
+          <textarea id="add-description" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none focus:ring-2 focus:ring-blue-500" rows="3"></textarea>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-semibold text-gray-700 mb-1">Project</label><input type="text" id="add-project" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-sm font-semibold text-gray-700 mb-1">Assignee</label><input type="text" id="add-assignee" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none focus:ring-2 focus:ring-blue-500"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Priority</label>
+            <select id="add-priority" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none bg-white focus:ring-2 focus:ring-blue-500">
+              <option value="medium">Medium</option><option value="low">Low</option><option value="high">High</option><option value="critical">Critical</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-1">Task Type</label>
+            <select id="add-type" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none bg-white focus:ring-2 focus:ring-blue-500">
+              <option value="general">General</option><option value="bug">Bug</option><option value="feature">Feature</option><option value="milestone">Milestone</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-semibold text-gray-700 mb-1">Start Date</label><input type="date" id="add-start-date" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none focus:ring-2 focus:ring-blue-500"></div>
+          <div><label class="block text-sm font-semibold text-gray-700 mb-1">Due Date</label><input type="date" id="add-due-date" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none focus:ring-2 focus:ring-blue-500"></div>
+        </div>
+        <div><label class="block text-sm font-semibold text-gray-700 mb-1">Blocked By (Task ID)</label><input type="text" id="add-blocked-by" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none focus:ring-2 focus:ring-blue-500"></div>
+      </div>
+      <div class="flex justify-end gap-3 mt-8 pt-4 border-t border-gray-100">
+        <button type="button" onclick="closeAddModal()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+        <button type="submit" id="submitAddBtn" class="px-5 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">Create Task</button>
+      </div>
+    </form>
+  </div>
+</div>
