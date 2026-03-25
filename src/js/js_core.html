@@ -60,6 +60,50 @@
     }
   }
 
+  // --- NEW: CRITICAL PATH ALGORITHM ---
+  function calculateCriticalPath(tasks) {
+    const activeTasks = tasks.filter(t => t.status !== 'completed');
+    const adjList = {};
+    
+    activeTasks.forEach(t => adjList[t.id] = []);
+    activeTasks.forEach(t => {
+      // If t is blocked by another active task, create a path: blocker -> t
+      if (t.blocked_by && adjList[t.blocked_by]) {
+        adjList[t.blocked_by].push(t.id);
+      }
+    });
+
+    let longestPath = [];
+    const memo = {};
+
+    function dfs(nodeId, currentPathVisited) {
+      if (currentPathVisited.has(nodeId)) return []; // Cycle detected (safety catch)
+      if (memo[nodeId]) return memo[nodeId];
+
+      currentPathVisited.add(nodeId);
+      let maxSubPath = [];
+      
+      for (const neighbor of adjList[nodeId]) {
+        const subPath = dfs(neighbor, new Set(currentPathVisited));
+        if (subPath.length > maxSubPath.length) {
+          maxSubPath = subPath;
+        }
+      }
+      
+      memo[nodeId] = [nodeId, ...maxSubPath];
+      return memo[nodeId];
+    }
+
+    activeTasks.forEach(t => {
+      const path = dfs(t.id, new Set());
+      if (path.length > longestPath.length && path.length > 1) {
+        longestPath = path;
+      }
+    });
+
+    return longestPath;
+  }
+
   function applyFiltersAndSort() {
     if (!currentTasks || currentTasks.length === 0) return;
 
@@ -107,8 +151,17 @@
       document.getElementById('table-view').classList.add('hidden');
       document.getElementById('no-results').classList.remove('hidden');
     } else {
-      renderBoard(processedTasks);
-      renderTable(processedTasks);
+      
+      // --- NEW: Calculate Critical Path ---
+      let criticalPathIds = [];
+      // Usually, it only makes sense to highlight the critical path if viewing a specific project
+      if (projectFilter !== 'all' && projectFilter !== 'unassigned') {
+        criticalPathIds = calculateCriticalPath(processedTasks);
+      }
+
+      // Pass the IDs to the renderers
+      renderBoard(processedTasks, criticalPathIds);
+      renderTable(processedTasks, criticalPathIds);
       switchView(currentView); 
     }
   }

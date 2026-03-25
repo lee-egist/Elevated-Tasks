@@ -1,6 +1,8 @@
 <script>
   // --- UI RENDERERS ---
-  function renderBoard(tasksToRender) {
+  
+  // Notice the new criticalPathIds parameter
+  function renderBoard(tasksToRender, criticalPathIds = []) {
     const statuses = ['open', 'in_progress', 'blocked', 'completed'];
     statuses.forEach(status => {
       const col = document.getElementById(`col-${status}`);
@@ -13,7 +15,14 @@
 
     tasksToRender.forEach(task => {
       const card = document.createElement('div');
-      card.className = "task-card bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md group relative";
+      
+      // --- NEW: Check if task is on Critical Path ---
+      const isCritical = criticalPathIds.includes(task.id);
+      
+      card.className = `task-card bg-white p-4 rounded-lg shadow-sm border hover:shadow-md group relative ${
+        isCritical ? 'border-red-500 ring-1 ring-red-500 shadow-red-100' : 'border-gray-200'
+      }`;
+      
       card.draggable = true;
       card.id = `task-${task.id}`;
       card.dataset.taskId = task.id;
@@ -26,11 +35,13 @@
       const isSubtask = !!task.parent;
       const titlePrefix = isSubtask ? '<span class="text-gray-400 font-bold mr-1">↳</span>' : '';
       
+      const criticalBadge = isCritical ? '<span class="text-xs bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded border border-red-200 mb-2 inline-block">🔥 Critical Path</span><br>' : '';
+
       if (isSubtask) card.classList.add('ml-6', 'border-l-4', 'border-l-blue-300');
 
       card.innerHTML = `
         <div class="flex justify-between items-start mb-1 gap-2">
-          <div class="font-medium text-gray-900 leading-tight">${titlePrefix}${task.title}</div>
+          <div class="font-medium text-gray-900 leading-tight">${criticalBadge}${titlePrefix}${task.title}</div>
           <button onclick="openEditModal('${task.id}')" class="text-gray-400 hover:text-blue-600 transition-colors p-1 -mt-1 -mr-1 rounded hover:bg-blue-50 opacity-0 group-hover:opacity-100" title="Edit Task">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
           </button>
@@ -42,7 +53,7 @@
         ${task.due_date || task.blocked_by ? `
         <div class="text-xs text-gray-500 mb-3 space-y-1 bg-gray-50 p-2 rounded border border-gray-100">
           ${task.due_date ? `<div class="flex items-center gap-1"><span>📅</span> Due: ${dueDateDisplay}</div>` : ''}
-          ${task.blocked_by ? `<div class="flex items-center gap-1 text-red-500 font-medium"><span>🚫</span> Blocked by: ${task.blocked_by}</div>` : ''}
+          ${task.blocked_by ? `<div class="flex items-center gap-1 text-red-500 font-medium"><span>🚫</span> Blocked by: ${task.blocked_by.substring(0,8)}...</div>` : ''}
         </div>
         ` : '<div class="mb-3"></div>'}
         <div class="flex justify-between items-end text-xs">
@@ -69,18 +80,24 @@
     });
   }
 
-  function renderTable(tasksToRender) {
+  function renderTable(tasksToRender, criticalPathIds = []) {
     const tbody = document.getElementById('table-body');
     tbody.innerHTML = '';
     
     tasksToRender.forEach(task => {
+      const isCritical = criticalPathIds.includes(task.id);
+      
       const tr = document.createElement('tr');
-      tr.className = "hover:bg-gray-50 transition-colors";
+      // Give the table row a slight red tint if it's on the critical path
+      tr.className = isCritical ? "bg-red-50 hover:bg-red-100 transition-colors" : "hover:bg-gray-50 transition-colors";
       
       const dueDateDisplay = task.due_date ? new Date(task.due_date).toLocaleDateString() : '-';
       const typeDisplay = task.type ? task.type.charAt(0).toUpperCase() + task.type.slice(1) : 'General';
       const isSubtask = !!task.parent;
       const titlePrefix = isSubtask ? '<span class="text-gray-400 font-bold mr-2 ml-6">↳</span>' : '';
+      
+      // Add a small flame icon next to the title in the table
+      const criticalIcon = isCritical ? '<span title="Critical Path" class="mr-1">🔥</span>' : '';
       
       let statusDisplay = 'Open';
       if (task.status === 'in_progress') statusDisplay = 'In Progress';
@@ -88,7 +105,7 @@
       if (task.status === 'completed') statusDisplay = 'Completed';
 
       tr.innerHTML = `
-        <td class="px-6 py-4 whitespace-nowrap"><div class="font-medium text-gray-900">${titlePrefix}${task.title}</div><div class="text-xs text-gray-500 ${isSubtask ? 'ml-10' : ''}">${typeDisplay}</div></td>
+        <td class="px-6 py-4 whitespace-nowrap"><div class="font-medium text-gray-900">${titlePrefix}${criticalIcon}${task.title}</div><div class="text-xs text-gray-500 ${isSubtask ? 'ml-10' : ''}">${typeDisplay}</div></td>
         <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 py-1 text-xs rounded-full font-medium ${getTableStatusStyle(task.status)}">${statusDisplay}</span></td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.project || '-'}</td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.assignee || '-'}</td>
