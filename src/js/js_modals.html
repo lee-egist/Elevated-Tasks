@@ -67,6 +67,7 @@
     };
 
     document.getElementById('edit-taskId').value = task.id;
+    document.getElementById('display-task-id').value = task.id;
     document.getElementById('edit-taskListId').value = task.taskListId;
     document.getElementById('edit-status').value = task.status; 
     document.getElementById('edit-title').value = task.title || '';
@@ -171,4 +172,26 @@
       })
       .deleteTask(taskId);
   }
+
+  // --- UTILITIES ---
+  function copyTaskId(event) {
+    const idInput = document.getElementById('display-task-id');
+    const btn = event.currentTarget;
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(idInput.value).then(() => {
+      // Visual feedback
+      const originalText = btn.innerText;
+      btn.innerText = 'Copied!';
+      btn.classList.add('bg-green-100', 'text-green-700', 'border-green-200');
+      
+      setTimeout(() => {
+        btn.innerText = originalText;
+        btn.classList.remove('bg-green-100', 'text-green-700', 'border-green-200');
+      }, 2000);
+    }).catch(err => {
+      alert("Failed to copy text: " + err);
+    });
+  }
+  
 </script>
