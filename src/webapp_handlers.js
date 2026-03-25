@@ -70,3 +70,38 @@ function updateDashboardTaskDetails(taskId, taskListId, updatedData) {
   updateTaskData(taskListId, taskId, updatedData.title || existingTask.title, buildElevatedNotes(getCleanNotes(existingTask.notes), metadata));
   return true;
 }
+
+/**
+ * Creates a new task directly from the Web App.
+ * Automatically splits human notes from JSON metadata.
+ */
+function createDashboardTask(taskListId, taskData) {
+  try {
+    const title = taskData.title || "Untitled";
+    const description = taskData.description || "";
+    
+    // Remove the standard fields so we are only left with the custom metadata
+    delete taskData.title;
+    delete taskData.description;
+    
+    // Inject the creation timestamp
+    const metadata = { 
+      ...taskData, 
+      updated_at: new Date().toISOString() 
+    };
+    
+    // Use your unified engine to package it properly with the delimiter
+    const finalNotes = buildElevatedNotes(description, metadata);
+    
+    // Insert it into Google Tasks
+    const createdTask = Tasks.Tasks.insert({
+      title: title,
+      notes: finalNotes
+    }, taskListId || "@default");
+    
+    return true;
+  } catch (err) {
+    console.error("Error creating Dashboard Task: " + err);
+    throw new Error("Failed to create task: " + err.message);
+  }
+}

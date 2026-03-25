@@ -450,7 +450,7 @@
       /**
       * Triggers when the "+ Add Task" button is clicked
       */
-/**
+      /**
        * Opens the custom Add Task Modal
        */
       function triggerAddTask() {
@@ -463,47 +463,68 @@
        * Closes the Add Task Modal
        */
       function closeAddModal() {
-        document.getElementById('addModal').style.display = 'none';
+        document.getElementById('add-title').value = ''; 
+        document.getElementById('add-description').value = ''; 
+        document.getElementById('add-project').value = ''; 
+        document.getElementById('add-assignee').value = ''; 
+        document.getElementById('add-priority').value = 'medium'; 
+        document.getElementById('add-type').value = 'general'; 
+        document.getElementById('add-start-date').value = ''; 
+        document.getElementById('add-due-date').value = ''; 
+        document.getElementById('add-blocked-by').value = ''; 
+
+        document.getElementById('addModal').style.display = 'flex';
+        document.getElementById('add-title').focus();
       }
 
       /**
        * Submits the new task to the server
        */
       function submitNewTask(ev) {
-        ev.preventDefault(); // Stop the form from refreshing the page
+        ev.preventDefault(); 
         
-        const titleInput = document.getElementById('add-title');
         const btnEl = document.getElementById('submitAddBtn');
-        const title = titleInput.value.trim();
+        const title = document.getElementById('add-title').value.trim();
         
         if (!title) return;
 
-        // Lock UI while saving
-        btnEl.innerText = "Adding...";
+        // Lock UI
+        btnEl.innerText = "Creating...";
         btnEl.disabled = true;
-        titleInput.disabled = true;
+
+        // Package all the new fields into a single object
+        const newTaskData = {
+          title: title,
+          description: document.getElementById('add-description').value,
+          project: document.getElementById('add-project').value,
+          assignee: document.getElementById('add-assignee').value,
+          priority: document.getElementById('add-priority').value,
+          status: "open", // Always open on creation
+          type: document.getElementById('add-type').value,
+          start_date: document.getElementById('add-start-date').value,
+          due_date: document.getElementById('add-due-date').value,
+          blocked_by: document.getElementById('add-blocked-by').value
+        };
 
         google.script.run
-          .withSuccessHandler(function(newTask) {
-            // Unlock UI, close modal, and reload tasks
-            btnEl.innerText = "Add Task";
+          .withSuccessHandler(function() {
+            btnEl.innerText = "Create Task";
             btnEl.disabled = false;
-            titleInput.disabled = false;
             closeAddModal();
-            loadTasks(); 
+            loadTasks(); // Reload the UI to show the new card
           })
           .withFailureHandler(function(error) {
             alert("Failed to create task: " + error.message);
-            btnEl.innerText = "Add Task";
+            btnEl.innerText = "Create Task";
             btnEl.disabled = false;
-            titleInput.disabled = false;
           })
-          .createTask(title, {status: "open"});
+          // We call our new dedicated webapp handler
+          .createDashboardTask("@default", newTaskData);
       }
       /**
       * Handles deleting the task while the Edit Modal is open
       */
-// Keep track of which task is about to be deleted
+      // Keep track of which task is about to be deleted
       let taskPendingDeletion = null;
 
       /**
