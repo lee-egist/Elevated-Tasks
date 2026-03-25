@@ -66,38 +66,6 @@ function fetchAndLinkTasks(taskListId = "all_lists") {
   return rootTasks; // Returns an array of parent tasks, with subtasks neatly tucked inside
 }
 
-function getTask(taskListId, taskId) {
-  return Tasks.Tasks.get(taskListId, taskId);
-}
-
-function insertTask(taskListId, taskData) {
-  return Tasks.Tasks.insert(taskData, taskListId);
-}
-
-function updateTaskData(taskListId, taskId, newTitle, newNotes) {
-  const task = Tasks.Tasks.get(taskListId, taskId);
-  task.title = newTitle;
-  task.notes = newNotes;
-  return Tasks.Tasks.update(task, taskListId, taskId);
-}
-
-function fetchExistingProjects(taskListId = "@default") {
-  const rootTasks = fetchAndLinkTasks(taskListId);
-  const projects = new Set();
-  
-  // Look through tasks to find existing project tags
-  rootTasks.forEach(task => {
-    if (task.metadata && task.metadata.project) {
-      projects.add(task.metadata.project);
-    }
-    task.children.forEach(child => {
-       if (child.metadata && child.metadata.project) projects.add(child.metadata.project);
-    });
-  });
-  
-  return Array.from(projects).sort();
-}
-
 /**
  * Creates a new task in the user's default task list.
  * @param {string} title - The visible title of the task.
@@ -119,6 +87,21 @@ function createTask(title, notes = "") {
   }
 }
 
+function getTask(taskListId, taskId) {
+  return Tasks.Tasks.get(taskListId, taskId);
+}
+
+function insertTask(taskListId, taskData) {
+  return Tasks.Tasks.insert(taskData, taskListId);
+}
+
+function updateTaskData(taskListId, taskId, newTitle, newNotes) {
+  const task = Tasks.Tasks.get(taskListId, taskId);
+  task.title = newTitle;
+  task.notes = newNotes;
+  return Tasks.Tasks.update(task, taskListId, taskId);
+}
+
 /**
  * Deletes a task from the user's default list.
  * @param {string} taskId - The unique ID of the task.
@@ -132,4 +115,21 @@ function deleteTask(taskId) {
     console.error("Error deleting task:", error);
     throw new Error("Failed to delete task: " + error.message, { cause: error });
   }
+}
+
+function fetchExistingProjects(taskListId = "@default") {
+  const rootTasks = fetchAndLinkTasks(taskListId);
+  const projects = new Set();
+  
+  // Look through tasks to find existing project tags
+  rootTasks.forEach(task => {
+    if (task.metadata && task.metadata.project) {
+      projects.add(task.metadata.project);
+    }
+    task.children.forEach(child => {
+       if (child.metadata && child.metadata.project) projects.add(child.metadata.project);
+    });
+  });
+  
+  return Array.from(projects).sort();
 }

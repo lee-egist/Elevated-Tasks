@@ -1,56 +1,58 @@
 /**
- * utils.gs
+ * utils.js
  * Contains shared constants and helper functions used across the project.
- * @module Utils
+ * Upgraded to the Bulletproof Metadata Engine.
  */
 
-/**
- * Configuration object containing string markers for elevated data.
- * @constant {Object}
- * @property {string} MARKER - The boundary string for elevated data.
- * @property {string} FULL_MARKER - The boundary string padded with newlines.
- */
 const CONFIG = {
-  MARKER: "--- ELEVATED DATA ---",
-  FULL_MARKER: "\n\n--- ELEVATED DATA ---\n"
+  DELIMITER: "|||" 
 };
 
 /**
- * Extracts and parses the JSON metadata object from a task's notes string.
- * * @param {string} notes - The raw notes string from a Google Task.
- * @returns {Object} The parsed metadata object, or an empty object if no metadata is found or parsing fails.
+ * Extracts and parses the JSON metadata object from the top of the notes string.
  */
-function parseMetadata(notes) {
-  if (!notes || !notes.includes(CONFIG.MARKER)) return {};
+function parseMetadata(rawNotes) {
+  const defaultMetadata = { status: 'open', priority: 'medium', project: '', assignee: '', type: 'general', blocked_by: '' };
+  
+  if (!rawNotes) return defaultMetadata;
+
   try {
-    const parts = notes.split(CONFIG.MARKER);
-    return JSON.parse(parts[1].trim());
+    const parts = rawNotes.split(CONFIG.DELIMITER);
+    const parsedData = JSON.parse(parts[0].trim());
+    return { ...defaultMetadata, ...parsedData };
   } catch (err) {
-    console.error("Metadata parsing failed:", err.message);
-    return {};
+    // If it fails (e.g., user deleted the JSON on their phone), return defaults
+    return defaultMetadata;
   }
 }
 
 /**
  * Strips out the hidden metadata block to return only the human-written notes.
- * * @param {string} notes - The raw notes string from a Google Task containing both notes and metadata.
- * @returns {string} The clean, human-readable portion of the notes.
  */
-function getCleanNotes(notes) {
-  if (!notes || !notes.includes(CONFIG.MARKER)) return notes || "";
-  return notes.split(CONFIG.MARKER)[0].trim();
+function getCleanNotes(rawNotes) {
+  if (!rawNotes || !rawNotes.includes(CONFIG.DELIMITER)) return rawNotes || "";
+  
+  // The human notes are everything AFTER the delimiter
+  const parts = rawNotes.split(CONFIG.DELIMITER);
+  return parts.length > 1 ? parts.slice(1).join(CONFIG.DELIMITER).trim() : "";
 }
 
 /**
- * Combines human-readable notes with the JSON metadata object into a single string 
- * formatted for saving to Google Tasks.
- * * @param {string} userNotes - The human-written notes.
- * @param {Object} metadataObj - The JavaScript object containing elevated task data (status, priority, etc.).
- * @returns {string} The combined string ready to be saved to the Task's notes field.
+ * Combines JSON metadata and human notes safely.
  */
 function buildElevatedNotes(userNotes, metadataObj) {
+  // Clean out empty properties so we don't waste character space
+  const cleanObj = Object.fromEntries(
+    Object.entries(metadataObj).filter(([_, v]) => v != null && v !== '')
+  );
+  
+  const jsonString = JSON.stringify(cleanObj);
   const safeNotes = userNotes || "";
-  return safeNotes + CONFIG.FULL_MARKER + JSON.stringify(metadataObj, null, 2);
+  
+  if (!safeNotes.trim()) return jsonString;
+  
+  // Put JSON on top, human notes on bottom
+  return `${jsonString} ${CONFIG.DELIMITER}\n\n${safeNotes.trim()}`;
 }
 
 /**
