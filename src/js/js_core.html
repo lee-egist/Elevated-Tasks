@@ -1,0 +1,134 @@
+<script>
+  // --- STATE & CONFIG ---
+  let currentTasks = [];
+  let currentView = 'board'; // Default View
+  const priorityWeights = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1, '': 0 };
+
+  // Initial Load
+  window.onload = loadTasks;
+
+  // --- API COMMUNICATION ---
+  function loadTasks() {
+    document.getElementById('board').classList.add('hidden');
+    document.getElementById('table-view').classList.add('hidden');
+    document.getElementById('no-results').classList.add('hidden');
+    document.getElementById('loading').classList.remove('hidden');
+    
+    google.script.run
+      .withSuccessHandler(receiveData)
+      .withFailureHandler(showError)
+      .getDashboardData();
+  }
+
+  function receiveData(tasks) {
+    currentTasks = tasks;
+    document.getElementById('loading').classList.add('hidden');
+    populateProjectFilter(tasks); 
+    applyFiltersAndSort(); 
+  }
+
+  function showError(err) {
+    document.getElementById('loading').innerHTML = `
+      <div class="text-red-600 bg-red-50 p-4 rounded-lg border border-red-200 shadow-sm max-w-md mx-auto text-center">
+        <strong class="block mb-2 text-lg">Error loading tasks</strong>
+        <span>${err.message}</span>
+      </div>
+    `;
+  }
+
+  // --- FILTERING & SORTING ---
+  function clearFilters() {
+    document.getElementById('filter-search').value = '';
+    document.getElementById('filter-status').value = 'all';
+    document.getElementById('filter-priority').value = 'all';
+    document.getElementById('filter-project').value = 'all';
+    document.getElementById('sort-by').value = 'default';
+    applyFiltersAndSort();
+  }
+
+  function populateProjectFilter(tasks) {
+    const projectSelect = document.getElementById('filter-project');
+    const currentSelection = projectSelect.value;
+    const projects = [...new Set(tasks.map(t => (t.project || '').trim()).filter(p => p !== ''))].sort();
+    
+    let optionsHtml = '<option value="all">All Projects</option><option value="unassigned">No Project</option>';
+    projects.forEach(p => optionsHtml += `<option value="${p}">${p}</option>`);
+    projectSelect.innerHTML = optionsHtml;
+    
+    if (currentSelection === 'unassigned' || projects.includes(currentSelection)) {
+      projectSelect.value = currentSelection;
+    }
+  }
+
+  function applyFiltersAndSort() {
+    if (!currentTasks || currentTasks.length === 0) return;
+
+    const searchText = document.getElementById('filter-search').value.toLowerCase();
+    const statusFilter = document.getElementById('filter-status').value;
+    const priorityFilter = document.getElementById('filter-priority').value;
+    const projectFilter = document.getElementById('filter-project').value;
+    const sortBy = document.getElementById('sort-by').value;
+
+    let processedTasks = currentTasks.filter(task => {
+      if (statusFilter !== 'all' && task.status !== statusFilter) return false;
+      if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
+      
+      const taskProject = (task.project || '').trim();
+      if (projectFilter !== 'all') {
+        if (projectFilter === 'unassigned' && taskProject !== '') return false;
+        if (projectFilter !== 'unassigned' && taskProject !== projectFilter) return false;
+      }
+
+      if (searchText) {
+        const matchesTitle = (task.title || '').toLowerCase().includes(searchText);
+        const matchesDesc = (task.description || '').toLowerCase().includes(searchText);
+        const matchesAssignee = (task.assignee || '').toLowerCase().includes(searchText);
+        const matchesProject = taskProject.toLowerCase().includes(searchText);
+        if (!matchesTitle && !matchesDesc && !matchesAssignee && !matchesProject) return false;
+      }
+      return true;
+    });
+
+    processedTasks.sort((a, b) => {
+      switch (sortBy) {
+        case 'dueDateAsc': return (a.due_date ? new Date(a.due_date) : Infinity) - (b.due_date ? new Date(b.due_date) : Infinity);
+        case 'dueDateDesc': return (b.due_date ? new Date(b.due_date) : 0) - (a.due_date ? new Date(a.due_date) : 0);
+        case 'priorityDesc': return (priorityWeights[b.priority || ''] || 0) - (priorityWeights[a.priority || ''] || 0);
+        case 'priorityAsc': return (priorityWeights[a.priority || ''] || 0) - (priorityWeights[b.priority || ''] || 0);
+        case 'titleAsc': return (a.title || '').localeCompare(b.title || '');
+        case 'projectAsc': return (a.project || '').localeCompare(b.project || '');
+        default: return 0; 
+      }
+    });
+
+    document.getElementById('no-results').classList.add('hidden');
+    if (processedTasks.length === 0) {
+      document.getElementById('board').classList.add('hidden');
+      document.getElementById('table-view').classList.add('hidden');
+      document.getElementById('no-results').classList.remove('hidden');
+    } else {
+      renderBoard(processedTasks);
+      renderTable(processedTasks);
+      switchView(currentView); 
+    }
+  }
+
+  function switchView(view) {
+    currentView = view;
+    const btnBoard = document.getElementById('btn-view-board');
+    const btnTable = document.getElementById('btn-view-table');
+    const boardContainer = document.getElementById('board');
+    const tableContainer = document.getElementById('table-view');
+    const noResults = !document.getElementById('no-results').classList.contains('hidden');
+
+    if (view === 'board') {
+      btnBoard.className = "px-3 py-1.5 bg-white shadow-sm rounded-md text-sm font-medium text-gray-800 transition-colors";
+      btnTable.className = "px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-md text-sm font-medium transition-colors";
+      if (!noResults) { boardContainer.classList.remove('hidden'); tableContainer.classList.add('hidden'); }
+    } else {
+      btnTable.className = "px-3 py-1.5 bg-white shadow-sm rounded-md text-sm font-medium text-gray-800 transition-colors";
+      btnBoard.className = "px-3 py-1.5 text-gray-600 hover:text-gray-800 rounded-md text-sm font-medium transition-colors";
+      if (!noResults) { tableContainer.classList.remove('hidden'); boardContainer.classList.add('hidden'); }
+    }
+  }
+</script>

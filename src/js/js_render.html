@@ -1,0 +1,158 @@
+<script>
+  // --- UI RENDERERS ---
+  function renderBoard(tasksToRender) {
+    const statuses = ['open', 'in_progress', 'blocked', 'completed'];
+    statuses.forEach(status => {
+      const col = document.getElementById(`col-${status}`);
+      if(col) col.innerHTML = '';
+      const count = document.getElementById(`count-${status}`);
+      if(count) count.innerText = '0';
+    });
+
+    const counts = { open: 0, in_progress: 0, blocked: 0, completed: 0 };
+
+    tasksToRender.forEach(task => {
+      const card = document.createElement('div');
+      card.className = "task-card bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md group relative";
+      card.draggable = true;
+      card.id = `task-${task.id}`;
+      card.dataset.taskId = task.id;
+      card.dataset.taskListId = task.taskListId;
+      card.ondragstart = dragStart;
+      card.ondragend = dragEnd;
+      
+      const dueDateDisplay = task.due_date ? new Date(task.due_date).toLocaleDateString() : '';
+      const typeDisplay = task.type ? task.type.charAt(0).toUpperCase() + task.type.slice(1) : 'General';
+      const isSubtask = !!task.parent;
+      const titlePrefix = isSubtask ? '<span class="text-gray-400 font-bold mr-1">↳</span>' : '';
+      
+      if (isSubtask) card.classList.add('ml-6', 'border-l-4', 'border-l-blue-300');
+
+      card.innerHTML = `
+        <div class="flex justify-between items-start mb-1 gap-2">
+          <div class="font-medium text-gray-900 leading-tight">${titlePrefix}${task.title}</div>
+          <button onclick="openEditModal('${task.id}')" class="text-gray-400 hover:text-blue-600 transition-colors p-1 -mt-1 -mr-1 rounded hover:bg-blue-50 opacity-0 group-hover:opacity-100" title="Edit Task">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+          </button>
+        </div>
+        <div class="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+          ${task.project || 'No Project'} &bull; ${typeDisplay}
+        </div>
+        ${task.due_date || task.blocked_by ? `
+        <div class="text-xs text-gray-500 mb-3 space-y-1 bg-gray-50 p-2 rounded border border-gray-100">
+          ${task.due_date ? `<div class="flex items-center gap-1"><span>📅</span> Due: ${dueDateDisplay}</div>` : ''}
+          ${task.blocked_by ? `<div class="flex items-center gap-1 text-red-500 font-medium"><span>🚫</span> Blocked by: ${task.blocked_by}</div>` : ''}
+        </div>
+        ` : '<div class="mb-3"></div>'}
+        <div class="flex justify-between items-end text-xs">
+          <div class="flex flex-col gap-1">
+            <span class="text-gray-400">Assignee:</span>
+            <span class="px-2 py-1 bg-gray-100 rounded text-gray-700 truncate max-w-[120px]" title="${task.assignee || 'Unassigned'}">${task.assignee || 'Unassigned'}</span>
+          </div>
+          <span class="${getPriorityStyle(task.priority)} px-2 py-1 rounded-md font-semibold capitalize border">${task.priority || 'None'}</span>
+        </div>
+      `;
+      
+      let colId = `col-${task.status}`;
+      let targetCol = document.getElementById(colId);
+      
+      if (!targetCol) { targetCol = document.getElementById('col-open'); counts.open++; } 
+      else { counts[task.status]++; }
+      
+      if(targetCol) targetCol.appendChild(card);
+    });
+
+    statuses.forEach(status => {
+      const countEl = document.getElementById(`count-${status}`);
+      if(countEl) countEl.innerText = counts[status];
+    });
+  }
+
+  function renderTable(tasksToRender) {
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = '';
+    
+    tasksToRender.forEach(task => {
+      const tr = document.createElement('tr');
+      tr.className = "hover:bg-gray-50 transition-colors";
+      
+      const dueDateDisplay = task.due_date ? new Date(task.due_date).toLocaleDateString() : '-';
+      const typeDisplay = task.type ? task.type.charAt(0).toUpperCase() + task.type.slice(1) : 'General';
+      const isSubtask = !!task.parent;
+      const titlePrefix = isSubtask ? '<span class="text-gray-400 font-bold mr-2 ml-6">↳</span>' : '';
+      
+      let statusDisplay = 'Open';
+      if (task.status === 'in_progress') statusDisplay = 'In Progress';
+      if (task.status === 'blocked') statusDisplay = 'Blocked';
+      if (task.status === 'completed') statusDisplay = 'Completed';
+
+      tr.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap"><div class="font-medium text-gray-900">${titlePrefix}${task.title}</div><div class="text-xs text-gray-500 ${isSubtask ? 'ml-10' : ''}">${typeDisplay}</div></td>
+        <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 py-1 text-xs rounded-full font-medium ${getTableStatusStyle(task.status)}">${statusDisplay}</span></td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.project || '-'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.assignee || '-'}</td>
+        <td class="px-6 py-4 whitespace-nowrap"><span class="${getPriorityStyle(task.priority)} px-2 py-1 rounded-md text-xs font-semibold capitalize border">${task.priority || 'None'}</span></td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${dueDateDisplay}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"><button onclick="openEditModal('${task.id}')" class="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded transition-colors shadow-sm border border-blue-100">Edit</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // --- HELPERS ---
+  function getPriorityStyle(priority) {
+    switch(priority) {
+      case 'high': case 'critical': return 'bg-red-50 text-red-700 border-red-200';
+      case 'medium': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'low': return 'bg-blue-50 text-blue-700 border-blue-200';
+      default: return 'bg-gray-50 text-gray-500 border-gray-200';
+    }
+  }
+
+  function getTableStatusStyle(status) {
+    switch(status) {
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'blocked': return 'bg-red-100 text-red-800';
+      case 'in_progress': return 'bg-blue-100 text-blue-800';
+      default: return 'bg-gray-200 text-gray-800';
+    }
+  }
+
+  // --- DRAG AND DROP ---
+  function dragStart(ev) {
+    ev.dataTransfer.setData("taskId", ev.target.dataset.taskId);
+    ev.dataTransfer.setData("taskListId", ev.target.dataset.taskListId);
+    ev.dataTransfer.effectAllowed = "move";
+    setTimeout(() => ev.target.classList.add('dragging'), 0);
+  }
+
+  function dragEnd(ev) { ev.target.classList.remove('dragging'); }
+
+  function allowDrop(ev) {
+    ev.preventDefault();
+    const column = ev.target.closest('.kanban-column');
+    if (column) column.classList.add('drag-over');
+  }
+
+  function dragLeave(ev) {
+    const column = ev.target.closest('.kanban-column');
+    if (column) column.classList.remove('drag-over');
+  }
+
+  function drop(ev, newStatus) {
+    ev.preventDefault();
+    const column = ev.target.closest('.kanban-column');
+    if (column) column.classList.remove('drag-over');
+
+    const taskId = ev.dataTransfer.getData("taskId");
+    const taskListId = ev.dataTransfer.getData("taskListId");
+    
+    const taskObjIndex = currentTasks.findIndex(t => t.id === taskId);
+    if (taskObjIndex > -1) {
+      currentTasks[taskObjIndex].status = newStatus;
+      applyFiltersAndSort(); 
+      google.script.run.updateDashboardTaskStatus(taskId, taskListId, newStatus);
+    }
+  }
+</script>

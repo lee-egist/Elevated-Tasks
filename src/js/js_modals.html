@@ -1,0 +1,174 @@
+<script>
+  // --- ADD TASK MODAL ---
+  function triggerAddTask() {
+    document.getElementById('add-title').value = ''; 
+    document.getElementById('add-description').value = ''; 
+    document.getElementById('add-project').value = ''; 
+    document.getElementById('add-assignee').value = ''; 
+    document.getElementById('add-priority').value = 'medium'; 
+    document.getElementById('add-type').value = 'general'; 
+    document.getElementById('add-start-date').value = ''; 
+    document.getElementById('add-due-date').value = ''; 
+    document.getElementById('add-blocked-by').value = ''; 
+
+    document.getElementById('addModal').style.display = 'flex';
+    document.getElementById('add-title').focus(); 
+  }
+
+  function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
+
+  function submitNewTask(ev) {
+    ev.preventDefault(); 
+    const btnEl = document.getElementById('submitAddBtn');
+    const title = document.getElementById('add-title').value.trim();
+    if (!title) return;
+
+    btnEl.innerText = "Creating...";
+    btnEl.disabled = true;
+
+    const newTaskData = {
+      title: title,
+      description: document.getElementById('add-description').value,
+      project: document.getElementById('add-project').value,
+      assignee: document.getElementById('add-assignee').value,
+      priority: document.getElementById('add-priority').value,
+      status: "open",
+      type: document.getElementById('add-type').value,
+      start_date: document.getElementById('add-start-date').value,
+      due_date: document.getElementById('add-due-date').value,
+      blocked_by: document.getElementById('add-blocked-by').value
+    };
+
+    google.script.run
+      .withSuccessHandler(function() {
+        btnEl.innerText = "Create Task";
+        btnEl.disabled = false;
+        closeAddModal();
+        loadTasks(); 
+      })
+      .withFailureHandler(function(error) {
+        alert("Failed to create task: " + error.message);
+        btnEl.innerText = "Create Task";
+        btnEl.disabled = false;
+      })
+      .createDashboardTask("@default", newTaskData);
+  }
+
+  // --- EDIT TASK MODAL ---
+  function openEditModal(taskId) {
+    const task = currentTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const formatDateForInput = (dateString) => {
+      if (!dateString) return '';
+      const d = new Date(dateString);
+      if (isNaN(d.getTime())) return '';
+      return d.toISOString().split('T')[0];
+    };
+
+    document.getElementById('edit-taskId').value = task.id;
+    document.getElementById('edit-taskListId').value = task.taskListId;
+    document.getElementById('edit-status').value = task.status; 
+    document.getElementById('edit-title').value = task.title || '';
+    document.getElementById('edit-description').value = task.description || '';
+    document.getElementById('edit-project').value = task.project || '';
+    document.getElementById('edit-assignee').value = task.assignee || '';
+    document.getElementById('edit-priority').value = task.priority || 'medium';
+    document.getElementById('edit-type').value = task.type || 'general';
+    document.getElementById('edit-start-date').value = formatDateForInput(task.start_date);
+    document.getElementById('edit-due-date').value = formatDateForInput(task.due_date);
+    document.getElementById('edit-blocked-by').value = task.blocked_by || '';
+
+    document.getElementById('editModal').classList.remove('hidden');
+  }
+
+  function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
+
+  function saveTaskEdit(ev) {
+    ev.preventDefault();
+    const btn = document.getElementById('saveBtn');
+    const text = document.getElementById('saveText');
+    const spinner = document.getElementById('saveSpinner');
+    
+    btn.disabled = true;
+    text.innerText = "Saving...";
+    if(spinner) spinner.classList.remove('hidden');
+
+    const taskId = document.getElementById('edit-taskId').value;
+    const taskListId = document.getElementById('edit-taskListId').value;
+    const updatedData = {
+      title: document.getElementById('edit-title').value,
+      description: document.getElementById('edit-description').value,
+      project: document.getElementById('edit-project').value,
+      assignee: document.getElementById('edit-assignee').value,
+      priority: document.getElementById('edit-priority').value,
+      status: document.getElementById('edit-status').value,
+      type: document.getElementById('edit-type').value,
+      start_date: document.getElementById('edit-start-date').value,
+      due_date: document.getElementById('edit-due-date').value,
+      blocked_by: document.getElementById('edit-blocked-by').value
+    };
+
+    google.script.run
+      .withSuccessHandler(() => {
+        const taskIndex = currentTasks.findIndex(t => t.id === taskId);
+        if (taskIndex > -1) {
+          currentTasks[taskIndex] = { ...currentTasks[taskIndex], ...updatedData };
+        }
+        populateProjectFilter(currentTasks);
+        applyFiltersAndSort();
+        closeEditModal();
+        resetSaveButton(btn, text, spinner);
+      })
+      .withFailureHandler((err) => {
+        alert("Error saving task: " + err.message);
+        resetSaveButton(btn, text, spinner);
+      })
+      .updateDashboardTaskDetails(taskId, taskListId, updatedData);
+  }
+
+  function resetSaveButton(btn, text, spinner) {
+    btn.disabled = false;
+    text.innerText = "Save Changes";
+    if(spinner) spinner.classList.add('hidden');
+  }
+
+  // --- DELETE TASK MODAL ---
+  let taskPendingDeletion = null;
+
+  function handleDeleteFromModal() {
+    const taskId = document.getElementById('edit-taskId').value;
+    if (!taskId) return;
+    taskPendingDeletion = taskId;
+    document.getElementById('deleteModal').style.display = 'flex';
+  }
+
+  function closeDeleteModal() {
+    taskPendingDeletion = null;
+    document.getElementById('deleteModal').style.display = 'none';
+    const btn = document.getElementById('confirmDeleteBtn');
+    if (btn) { btn.innerText = 'Yes, Delete'; btn.disabled = false; }
+  }
+
+  function executeDeleteTask() {
+    if (!taskPendingDeletion) return;
+    const taskId = taskPendingDeletion;
+    const btn = document.getElementById('confirmDeleteBtn');
+    
+    btn.innerText = "Deleting...";
+    btn.disabled = true;
+
+    closeDeleteModal();
+    closeEditModal(); 
+    
+    const cardElement = document.getElementById('task-' + taskId);
+    if (cardElement) cardElement.remove();
+
+    google.script.run
+      .withFailureHandler(function(error) {
+        alert("Server failed to delete task: " + error.message);
+        loadTasks(); 
+      })
+      .deleteTask(taskId);
+  }
+</script>
