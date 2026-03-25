@@ -3,7 +3,7 @@
   <head>
     <base target="_top">
     <script src="https://cdn.tailwindcss.com"></script>
-    <?!= include('style'); ?>
+    <?!= include('frontend/style'); ?>
   </head>
   <body class="p-4 sm:p-6 font-sans antialiased text-gray-800">
     <div class="max-w-7xl mx-auto">
@@ -63,8 +63,8 @@
     <?!= include('components/modal_edit'); ?>
     <?!= include('components/modal_delete'); ?>
 
-    <?!= include('js_core'); ?>
-    <?!= include('js_render'); ?>
-    <?!= include('js_modals'); ?>
+    <?!= include('js/js_core'); ?>
+    <?!= include('js/js_render'); ?>
+    <?!= include('js/js_modals'); ?>
   </body>
 </html>
