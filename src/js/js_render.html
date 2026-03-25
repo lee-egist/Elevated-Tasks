@@ -1,4 +1,15 @@
 <script>
+
+    // --- HELPERS ---
+  /**
+   * Looks up a task by its ID and returns its title.
+   */
+  function getTaskTitleById(taskId) {
+    if (!taskId) return '';
+    const task = currentTasks.find(t => t.id === taskId);
+    return task ? task.title : '(Unknown or Deleted Task)';
+  }
+
   // --- UI RENDERERS ---
   
   // Notice the new criticalPathIds parameter
@@ -53,7 +64,7 @@
         ${task.due_date || task.blocked_by ? `
         <div class="text-xs text-gray-500 mb-3 space-y-1 bg-gray-50 p-2 rounded border border-gray-100">
           ${task.due_date ? `<div class="flex items-center gap-1"><span>📅</span> Due: ${dueDateDisplay}</div>` : ''}
-          ${task.blocked_by ? `<div class="flex items-center gap-1 text-red-500 font-medium"><span>🚫</span> Blocked by: ${task.blocked_by.substring(0,8)}...</div>` : ''}
+          ${task.blocked_by ? `<div class="flex items-center gap-1 text-red-500 font-medium truncate" title="ID: ${task.blocked_by}"><span>🚫</span> Blocked by: ${getTaskTitleById(task.blocked_by)}</div>` : ''}
         </div>
         ` : '<div class="mb-3"></div>'}
         <div class="flex justify-between items-end text-xs">
@@ -103,9 +114,17 @@
       if (task.status === 'in_progress') statusDisplay = 'In Progress';
       if (task.status === 'blocked') statusDisplay = 'Blocked';
       if (task.status === 'completed') statusDisplay = 'Completed';
+      
+
+      const blockedDisplay = task.blocked_by ? `<div class="text-xs text-red-500 font-medium mt-1 ${isSubtask ? 'ml-10' : ''}">🚫 Blocked by: ${getTaskTitleById(task.blocked_by)}</div>` : '';
 
       tr.innerHTML = `
-        <td class="px-6 py-4 whitespace-nowrap"><div class="font-medium text-gray-900">${titlePrefix}${criticalIcon}${task.title}</div><div class="text-xs text-gray-500 ${isSubtask ? 'ml-10' : ''}">${typeDisplay}</div></td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="font-medium text-gray-900">${titlePrefix}${criticalIcon}${task.title}</div>
+          <div class="text-xs text-gray-500 ${isSubtask ? 'ml-10' : ''}">${typeDisplay}</div>
+          ${blockedDisplay}
+        </td>
+      
         <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 py-1 text-xs rounded-full font-medium ${getTableStatusStyle(task.status)}">${statusDisplay}</span></td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.project || '-'}</td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.assignee || '-'}</td>
