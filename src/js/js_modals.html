@@ -1,6 +1,6 @@
 <script>
 
-    // --- PROJECT DATA & UI ---
+  // --- PROJECT DATA & UI ---
   let globalProjects = [];
 
   // Fetch projects as soon as the app loads
@@ -8,16 +8,16 @@
 
   function fetchProjects() {
     google.script.run
-      .withSuccessHandler(function(projects) {
+      .withSuccessHandler(function (projects) {
         globalProjects = projects;
         populateProjectDropdowns();
-        
+
         // Also update the main dashboard filter in js_core!
         if (typeof renderDashboardProjectFilter === 'function') {
           renderDashboardProjectFilter(projects);
         }
       })
-      .withFailureHandler(function(err) {
+      .withFailureHandler(function (err) {
         console.error("Failed to load projects: ", err);
       })
       .getDashboardProjects();
@@ -26,11 +26,11 @@
   function populateProjectDropdowns() {
     const addSelect = document.getElementById('add-project');
     const editSelect = document.getElementById('edit-project');
-    
+
     let optionsHtml = '<option value="">-- No Project (Unassigned) --</option>';
     globalProjects.forEach(p => {
       // Remember: The value is now the strict UUID, but the user sees the Name!
-      optionsHtml += `<option value="${p.id}">${p.name}</option>`; 
+      optionsHtml += `<option value="${p.id}">${p.name}</option>`;
     });
 
     if (addSelect) addSelect.innerHTML = optionsHtml;
@@ -40,7 +40,7 @@
   // Handle the "+ New" Button
   function handleCreateProject() {
     const projectName = prompt("Enter the name of the new Project:\n(You will automatically be set as the Owner)");
-    
+
     if (!projectName || projectName.trim() === "") return;
 
     // Show loading state on the button
@@ -48,12 +48,12 @@
     btns.forEach(b => { b.innerText = "..."; b.disabled = true; });
 
     google.script.run
-      .withSuccessHandler(function(newProject) {
+      .withSuccessHandler(function (newProject) {
         // Add it to our local array and re-render the dropdowns
         globalProjects.push(newProject);
         globalProjects.sort((a, b) => a.name.localeCompare(b.name));
         populateProjectDropdowns();
-        
+
         if (typeof renderDashboardProjectFilter === 'function') {
           renderDashboardProjectFilter(globalProjects);
         }
@@ -70,33 +70,33 @@
 
         btns.forEach(b => { b.innerText = "+ New"; b.disabled = false; });
       })
-      .withFailureHandler(function(err) {
+      .withFailureHandler(function (err) {
         alert("Failed to create project: " + err.message);
         btns.forEach(b => { b.innerText = "+ New"; b.disabled = false; });
       })
       .createNewProject(projectName);
   }
-  
+
   // --- ADD TASK MODAL ---
   function triggerAddTask() {
-    document.getElementById('add-title').value = ''; 
-    document.getElementById('add-description').value = ''; 
-    document.getElementById('add-project').value = ''; 
-    document.getElementById('add-assignee').value = ''; 
-    document.getElementById('add-priority').value = 'medium'; 
-    document.getElementById('add-type').value = 'general'; 
-    document.getElementById('add-start-date').value = ''; 
-    document.getElementById('add-due-date').value = ''; 
-    document.getElementById('add-blocked-by').value = ''; 
+    document.getElementById('add-title').value = '';
+    document.getElementById('add-description').value = '';
+    document.getElementById('add-project').value = '';
+    document.getElementById('add-assignee').value = '';
+    document.getElementById('add-priority').value = 'medium';
+    document.getElementById('add-type').value = 'general';
+    document.getElementById('add-start-date').value = '';
+    document.getElementById('add-due-date').value = '';
+    document.getElementById('add-blocked-by').value = '';
 
     document.getElementById('addModal').style.display = 'flex';
-    document.getElementById('add-title').focus(); 
+    document.getElementById('add-title').focus();
   }
 
   function closeAddModal() { document.getElementById('addModal').style.display = 'none'; }
 
   function submitNewTask(ev) {
-    ev.preventDefault(); 
+    ev.preventDefault();
     const btnEl = document.getElementById('submitAddBtn');
     const title = document.getElementById('add-title').value.trim();
     if (!title) return;
@@ -118,13 +118,13 @@
     };
 
     google.script.run
-      .withSuccessHandler(function() {
+      .withSuccessHandler(function () {
         btnEl.innerText = "Create Task";
         btnEl.disabled = false;
         closeAddModal();
-        loadTasks(); 
+        loadTasks();
       })
-      .withFailureHandler(function(error) {
+      .withFailureHandler(function (error) {
         alert("Failed to create task: " + error.message);
         btnEl.innerText = "Create Task";
         btnEl.disabled = false;
@@ -147,7 +147,7 @@
     document.getElementById('edit-taskId').value = task.id;
     document.getElementById('display-task-id').value = task.id;
     document.getElementById('edit-taskListId').value = task.taskListId;
-    document.getElementById('edit-status').value = task.status; 
+    document.getElementById('edit-status').value = task.status;
     document.getElementById('edit-title').value = task.title || '';
     document.getElementById('edit-description').value = task.description || '';
     document.getElementById('edit-project').value = task.project || '';
@@ -168,10 +168,10 @@
     const btn = document.getElementById('saveBtn');
     const text = document.getElementById('saveText');
     const spinner = document.getElementById('saveSpinner');
-    
+
     btn.disabled = true;
     text.innerText = "Saving...";
-    if(spinner) spinner.classList.remove('hidden');
+    if (spinner) spinner.classList.remove('hidden');
 
     const taskId = document.getElementById('edit-taskId').value;
     const taskListId = document.getElementById('edit-taskListId').value;
@@ -209,7 +209,7 @@
   function resetSaveButton(btn, text, spinner) {
     btn.disabled = false;
     text.innerText = "Save Changes";
-    if(spinner) spinner.classList.add('hidden');
+    if (spinner) spinner.classList.add('hidden');
   }
 
   // --- DELETE TASK MODAL ---
@@ -233,20 +233,20 @@
     if (!taskPendingDeletion) return;
     const taskId = taskPendingDeletion;
     const btn = document.getElementById('confirmDeleteBtn');
-    
+
     btn.innerText = "Deleting...";
     btn.disabled = true;
 
     closeDeleteModal();
-    closeEditModal(); 
-    
+    closeEditModal();
+
     const cardElement = document.getElementById('task-' + taskId);
     if (cardElement) cardElement.remove();
 
     google.script.run
-      .withFailureHandler(function(error) {
+      .withFailureHandler(function (error) {
         alert("Server failed to delete task: " + error.message);
-        loadTasks(); 
+        loadTasks();
       })
       .deleteTask(taskId);
   }
@@ -255,14 +255,14 @@
   function copyTaskId(event) {
     const idInput = document.getElementById('display-task-id');
     const btn = event.currentTarget;
-    
+
     // Copy to clipboard
     navigator.clipboard.writeText(idInput.value).then(() => {
       // Visual feedback
       const originalText = btn.innerText;
       btn.innerText = 'Copied!';
       btn.classList.add('bg-green-100', 'text-green-700', 'border-green-200');
-      
+
       setTimeout(() => {
         btn.innerText = originalText;
         btn.classList.remove('bg-green-100', 'text-green-700', 'border-green-200');
@@ -272,4 +272,76 @@
     });
   }
 
+  // --- IMPORT MODAL ---
+  function openImportModal() {
+    document.getElementById('importModal').style.display = 'flex';
+  }
+
+  function closeImportModal() {
+    document.getElementById('importModal').style.display = 'none';
+  }
+
+  function runGoogleTasksMigration(btnElement) {
+    const originalHtml = btnElement.innerHTML;
+    btnElement.innerHTML = `<div class="p-4 text-center w-full font-bold text-blue-600">Migrating Tasks... Please wait ⏳</div>`;
+    btnElement.disabled = true;
+
+    google.script.run
+      .withSuccessHandler((count) => {
+        alert(`Success! Imported ${count} tasks into Supabase.`);
+        closeImportModal();
+        btnElement.innerHTML = originalHtml;
+        btnElement.disabled = false;
+        loadTasks(); // Refresh the board!
+      })
+      .withFailureHandler((err) => {
+        alert("Migration failed: " + err.message);
+        btnElement.innerHTML = originalHtml;
+        btnElement.disabled = false;
+      })
+      .migrateLegacyGoogleTasks();
+  }
+
+// --- CSV UPLOAD HANDLING ---
+  let selectedPlatform = 'generic';
+
+  function triggerCSVUpload(platform) {
+    selectedPlatform = platform;
+    document.getElementById('csvFileInput').click(); // Opens the hidden file browser
+  }
+
+  function handleCSVSelection(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Show the progress UI
+    document.getElementById('csvUploadProgress').classList.remove('hidden');
+    document.getElementById('csvUploadStatus').innerText = `Uploading ${file.name} to server...`;
+
+    // Read the file as text
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const csvContent = e.target.result;
+      
+      // Send the raw CSV text and the platform name to our backend parser
+      google.script.run
+        .withSuccessHandler(function(result) {
+          document.getElementById('csvUploadProgress').classList.add('hidden');
+          alert(`Success! Imported ${result.count} tasks from ${selectedPlatform}.`);
+          closeImportModal();
+          loadTasks(); // Refresh your dashboard
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('csvUploadProgress').classList.add('hidden');
+          alert(`Error importing CSV: ${err.message}`);
+        })
+        .processCSVImport(csvContent, selectedPlatform);
+    };
+    
+    reader.readAsText(file);
+    
+    // Clear the input so they can upload the same file again if it failed
+    event.target.value = ''; 
+  }
+  
 </script>
