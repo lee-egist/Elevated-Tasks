@@ -7,14 +7,17 @@
 function getSupabaseHeaders() {
   const props = PropertiesService.getScriptProperties();
   const serviceKey = props.getProperty('SUPABASE_SERVICE_KEY');
+  const anonKey = props.getProperty('SUPABASE_ANON_KEY'); // Fetch the new public key
   
-  if (!serviceKey) throw new Error("Missing SUPABASE_SERVICE_KEY in Script Properties.");
+  if (!serviceKey || !anonKey) {
+    throw new Error("Missing Supabase keys in Script Properties. Ensure both SUPABASE_SERVICE_KEY and SUPABASE_ANON_KEY are set.");
+  }
 
   return {
-    "apikey": serviceKey,
-    "Authorization": "Bearer " + serviceKey,
+    "apikey": anonKey,                       // Gets us past the API Gateway browser check
+    "Authorization": "Bearer " + serviceKey, // Gives us backend "God mode" in the database
     "Content-Type": "application/json",
-    "Prefer": "return=representation" // Tells Supabase to return the inserted/updated row back to us
+    "Prefer": "return=representation" 
   };
 }
 
