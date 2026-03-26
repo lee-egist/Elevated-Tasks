@@ -22,6 +22,7 @@ function parseMetadata(rawNotes) {
     return { ...defaultMetadata, ...parsedData };
   } catch (err) {
     // If it fails (e.g., user deleted the JSON on their phone), return defaults
+    console.warn("Failed to parse metadata" + err.message);
     return defaultMetadata;
   }
 }

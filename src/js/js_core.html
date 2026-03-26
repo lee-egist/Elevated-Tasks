@@ -46,17 +46,27 @@
     applyFiltersAndSort();
   }
 
-  function populateProjectFilter(tasks) {
+// --- UPDATED DASHBOARD FILTER ---
+  function renderDashboardProjectFilter(projects) {
     const projectSelect = document.getElementById('filter-project');
-    const currentSelection = projectSelect.value;
-    const projects = [...new Set(tasks.map(t => (t.project || '').trim()).filter(p => p !== ''))].sort();
+    if (!projectSelect) return;
     
+    const currentSelection = projectSelect.value;
+    
+    // We use the UUID as the value now!
     let optionsHtml = '<option value="all">All Projects</option><option value="unassigned">No Project</option>';
-    projects.forEach(p => optionsHtml += `<option value="${p}">${p}</option>`);
+    projects.forEach(p => {
+      optionsHtml += `<option value="${p.id}">${p.name}</option>`;
+    });
+    
     projectSelect.innerHTML = optionsHtml;
     
-    if (currentSelection === 'unassigned' || projects.includes(currentSelection)) {
+    // Attempt to restore their previous selection if it still exists
+    const exists = projects.some(p => p.id === currentSelection);
+    if (currentSelection === 'unassigned' || exists) {
       projectSelect.value = currentSelection;
+    } else {
+      projectSelect.value = 'all';
     }
   }
 

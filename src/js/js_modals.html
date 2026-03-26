@@ -1,4 +1,82 @@
 <script>
+
+    // --- PROJECT DATA & UI ---
+  let globalProjects = [];
+
+  // Fetch projects as soon as the app loads
+  window.addEventListener('DOMContentLoaded', fetchProjects);
+
+  function fetchProjects() {
+    google.script.run
+      .withSuccessHandler(function(projects) {
+        globalProjects = projects;
+        populateProjectDropdowns();
+        
+        // Also update the main dashboard filter in js_core!
+        if (typeof renderDashboardProjectFilter === 'function') {
+          renderDashboardProjectFilter(projects);
+        }
+      })
+      .withFailureHandler(function(err) {
+        console.error("Failed to load projects: ", err);
+      })
+      .getDashboardProjects();
+  }
+
+  function populateProjectDropdowns() {
+    const addSelect = document.getElementById('add-project');
+    const editSelect = document.getElementById('edit-project');
+    
+    let optionsHtml = '<option value="">-- No Project (Unassigned) --</option>';
+    globalProjects.forEach(p => {
+      // Remember: The value is now the strict UUID, but the user sees the Name!
+      optionsHtml += `<option value="${p.id}">${p.name}</option>`; 
+    });
+
+    if (addSelect) addSelect.innerHTML = optionsHtml;
+    if (editSelect) editSelect.innerHTML = optionsHtml;
+  }
+
+  // Handle the "+ New" Button
+  function handleCreateProject() {
+    const projectName = prompt("Enter the name of the new Project:\n(You will automatically be set as the Owner)");
+    
+    if (!projectName || projectName.trim() === "") return;
+
+    // Show loading state on the button
+    const btns = document.querySelectorAll('button[onclick="handleCreateProject()"]');
+    btns.forEach(b => { b.innerText = "..."; b.disabled = true; });
+
+    google.script.run
+      .withSuccessHandler(function(newProject) {
+        // Add it to our local array and re-render the dropdowns
+        globalProjects.push(newProject);
+        globalProjects.sort((a, b) => a.name.localeCompare(b.name));
+        populateProjectDropdowns();
+        
+        if (typeof renderDashboardProjectFilter === 'function') {
+          renderDashboardProjectFilter(globalProjects);
+        }
+
+        // Auto-select the newly created project in the active modal
+        const addSelect = document.getElementById('add-project');
+        const editSelect = document.getElementById('edit-project');
+        if (addSelect && document.getElementById('addModal').style.display !== 'none') {
+          addSelect.value = newProject.id;
+        }
+        if (editSelect && !document.getElementById('editModal').classList.contains('hidden')) {
+          editSelect.value = newProject.id;
+        }
+
+        btns.forEach(b => { b.innerText = "+ New"; b.disabled = false; });
+      })
+      .withFailureHandler(function(err) {
+        alert("Failed to create project: " + err.message);
+        btns.forEach(b => { b.innerText = "+ New"; b.disabled = false; });
+      })
+      .createNewProject(projectName);
+  }
+  
   // --- ADD TASK MODAL ---
   function triggerAddTask() {
     document.getElementById('add-title').value = ''; 
@@ -193,5 +271,5 @@
       alert("Failed to copy text: " + err);
     });
   }
-  
+
 </script>

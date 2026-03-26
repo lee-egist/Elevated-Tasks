@@ -24,22 +24,23 @@ export default [
         Tasks: "readonly",
         console: "readonly",
 
-        // --- Add your Custom Global Functions here ---
-        // If Code.js calls a function defined in api.js, 
-        // add the function name here so ESLint knows it exists.
-        fetchAllTaskLists: "writable",
+        // --- Custom Global Functions ---
+        // UI & Handlers
         buildDashboardCard: "writable",
         buildTaskCard: "writable",
-        fetchAndLinkTasks: "writable",
-        fetchExistingProjects: "writable",
         getWorkspaceUsers: "writable",
-        insertTask: "writable",
-        createElevatedTask: "writable",
-        getTask: "writable",
-        parseMetadata: "writable",
-        updateTaskData: "writable",
-        buildElevatedNotes: "writable",
-        getCleanNotes: "writable",
+        isValidUUID: "writable",
+        createNewProject: "writable",
+        
+        // Supabase Database API
+        dbCreateTask: "writable",
+        dbDeleteTask: "writable",
+        dbGetTasks: "writable",
+        dbGetProjects: "writable",
+        dbUpdateTask: "writable",
+        dbCreateProject: "writable"
+        
+        // (We will add dbCreateProject here shortly!)
       },
     },
     rules: {
@@ -52,4 +53,4 @@ export default [
       "no-redeclare": "off",
     },
   },
-]; 
+];

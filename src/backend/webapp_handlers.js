@@ -1,13 +1,11 @@
 /**
  * webapp_handlers.js
  * Handles endpoints and data formatting specifically for the full-screen Web App.
+ * Upgraded to use Supabase as the Source of Truth.
  */
 
 function doGet(e) {
-  // Use createTemplateFromFile instead of createHtmlOutputFromFile
   const template = HtmlService.createTemplateFromFile('frontend/dashboard');
-
-  // Evaluate the template (which runs the 'include' functions) before returning
   return template.evaluate()
       .setTitle("Elevated Tasks Dashboard")
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
@@ -15,93 +13,167 @@ function doGet(e) {
 }
 
 /**
- * Called by the Web App to get tasks. Uses the core API fetcher and flattens it for the Kanban board.
+ * Called by the Web App to get tasks.
+ * Fetches directly from Supabase and maps them for the frontend.
  */
-function getDashboardData(taskListId = "all_lists") {
+function getDashboardData() {
   try {
-    const rootTasks = fetchAndLinkTasks(taskListId);
-    const finalSortedTasks = [];
+    const supabaseTasks = dbGetTasks();
+    if (!supabaseTasks) return [];
 
-    // Helper to map a task for the Web App frontend
-    const mapForFrontend = (task) => ({
+    // Map Supabase rows to the format the frontend expects
+    return supabaseTasks.map(task => ({
       id: task.id,
-      taskListId: task.actualListId, 
+      taskListId: "@supabase", // Placeholder to keep the frontend drag-and-drop happy
       title: task.title || "",
-      parent: task.parent || null,
-      project: task.metadata.project || "",
-      assignee: task.metadata.assignee || "",
-      status: task.metadata.status || "open",
-      priority: task.metadata.priority || "medium",
-      type: task.metadata.type || "general",
-      due_date: task.metadata.due_date || "",
-      blocked_by: task.metadata.blocked_by || "",
-      updated_at: task.metadata.updated_at || ""
-    });
-
-    // Strictly sort Parents -> Children to prevent visual bugs
-    rootTasks.forEach(rootTask => {
-      finalSortedTasks.push(mapForFrontend(rootTask));
-      if (rootTask.children && rootTask.children.length > 0) {
-        rootTask.children.forEach(child => finalSortedTasks.push(mapForFrontend(child)));
-      }
-    });
-
-    return finalSortedTasks;
+      description: task.description || "",
+      parent: null, // Subtasks can be re-added later if needed
+      
+      // Because we used 'select=*,projects(name)' in supabase.js, 
+      // the project name is nested inside a 'projects' object!
+      project: task.projects ? task.projects.name : "", 
+      project_id: task.project_id || "",
+      
+      assignee: task.assignee || "",
+      status: task.status || "open",
+      priority: task.priority || "medium",
+      type: task.type || "general",
+      start_date: task.start_date || "",
+      due_date: task.due_date || "",
+      blocked_by: task.blocked_by || "",
+      updated_at: task.updated_at || ""
+    }));
   } catch (err) {
     console.error("Web App Data Error: " + err);
-    return [];
+    throw new Error("Failed to load tasks: " + err.message, { cause: err });
   }
 }
 
-function updateDashboardTaskStatus(taskId, taskListId, newStatus) {
-  const existingTask = getTask(taskListId, taskId);
-  const metadata = parseMetadata(existingTask.notes);
-  metadata.status = newStatus;
-  metadata.updated_at = new Date().toISOString();
-  
-  updateTaskData(taskListId, taskId, existingTask.title, buildElevatedNotes(getCleanNotes(existingTask.notes), metadata));
-  return true;
-}
-
-function updateDashboardTaskDetails(taskId, taskListId, updatedData) {
-  const existingTask = getTask(taskListId, taskId);
-  const metadata = { ...parseMetadata(existingTask.notes), ...updatedData, updated_at: new Date().toISOString() };
-  
-  updateTaskData(taskListId, taskId, updatedData.title || existingTask.title, buildElevatedNotes(getCleanNotes(existingTask.notes), metadata));
-  return true;
-}
-
 /**
- * Creates a new task directly from the Web App.
- * Automatically splits human notes from JSON metadata.
+ * Creates a new task in Supabase
  */
 function createDashboardTask(taskListId, taskData) {
   try {
-    const title = taskData.title || "Untitled";
-    const description = taskData.description || "";
+    // Automatically capture who is creating the task
+    const currentUser = Session.getActiveUser().getEmail();
     
-    // Remove the standard fields so we are only left with the custom metadata
-    delete taskData.title;
-    delete taskData.description;
-    
-    // Inject the creation timestamp
-    const metadata = { 
-      ...taskData, 
-      updated_at: new Date().toISOString() 
+    const supabasePayload = {
+      title: taskData.title || "Untitled",
+      description: taskData.description || "",
+      owner: currentUser,
+      assignee: taskData.assignee || null,
+      status: taskData.status || "open",
+      priority: taskData.priority || "medium",
+      type: taskData.type || "general",
+      start_date: taskData.start_date ? taskData.start_date : null,
+      due_date: taskData.due_date ? taskData.due_date : null,
+      
+      // Safety Checks: Ensure they are actual UUIDs before sending to the DB
+      project_id: isValidUUID(taskData.project) ? taskData.project : null,
+      blocked_by: isValidUUID(taskData.blocked_by) ? taskData.blocked_by : null
     };
     
-    // Use your unified engine to package it properly with the delimiter
-    const finalNotes = buildElevatedNotes(description, metadata);
-    
-    // Insert it into Google Tasks
-    const createdTask = Tasks.Tasks.insert({
-      title: title,
-      notes: finalNotes
-    }, taskListId || "@default");
-    
+    dbCreateTask(supabasePayload);
     return true;
   } catch (err) {
     console.error("Error creating Dashboard Task: " + err);
     throw new Error("Failed to create task: " + err.message, { cause: err });
+  }
+}
+
+/**
+ * Updates just the status (used for Kanban Drag & Drop)
+ */
+function updateDashboardTaskStatus(taskId, taskListId, newStatus) {
+  try {
+    const payload = { status: newStatus };
+    
+    // Automation: Automatically stamp completion metrics!
+    if (newStatus === 'completed') {
+       payload.completed_at = new Date().toISOString();
+    }
+    if (newStatus === 'in_progress') {
+       payload.started_at = new Date().toISOString();
+    }
+
+    dbUpdateTask(taskId, payload);
+    return true;
+  } catch (err) {
+    throw new Error("Failed to update status: " + err.message, { cause: err });
+  }
+}
+
+/**
+ * Updates full task details from the Edit Modal
+ */
+function updateDashboardTaskDetails(taskId, taskListId, updatedData) {
+  try {
+    const payload = {
+      title: updatedData.title,
+      description: updatedData.description,
+      assignee: updatedData.assignee || null,
+      priority: updatedData.priority,
+      status: updatedData.status,
+      type: updatedData.type,
+      start_date: updatedData.start_date ? updatedData.start_date : null,
+      due_date: updatedData.due_date ? updatedData.due_date : null,
+      
+      project_id: isValidUUID(updatedData.project) ? updatedData.project : null,
+      blocked_by: isValidUUID(updatedData.blocked_by) ? updatedData.blocked_by : null
+    };
+
+    dbUpdateTask(taskId, payload);
+    return true;
+  } catch (err) {
+    throw new Error("Failed to update task: " + err.message, { cause: err });
+  }
+}
+
+/**
+ * Deletes a task from Supabase
+ */
+function deleteTask(taskId) {
+  try {
+    dbDeleteTask(taskId);
+    return true;
+  } catch (err) {
+    throw new Error("Failed to delete task: " + err.message, { cause: err });
+  }
+}
+
+/**
+ * Utility: Checks if a string is a valid UUID to prevent database crashes
+ */
+function isValidUUID(str) {
+  if (!str) return false;
+  const regexExp = /^[0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{4}\b-[0-9a-fA-F]{12}$/gi;
+  return regexExp.test(str);
+}
+
+/**
+ * Fetches all projects for the frontend dropdowns
+ */
+function getDashboardProjects() {
+  return dbGetProjects();
+}
+
+/**
+ * Called by the Web App (or Gmail Add-on) to create a new project.
+ */
+function createNewProject(projectName, projectDescription) {
+  try {
+    if (!projectName || projectName.trim() === "") {
+      throw new Error("Project name cannot be empty.");
+    }
+
+    const newProject = dbCreateProject({
+      name: projectName.trim(),
+      description: projectDescription ? projectDescription.trim() : ""
+    });
+    
+    return newProject;
+  } catch (err) {
+    console.error("Error creating project: " + err);
+    throw new Error("Failed to create project: " + err.message, { cause: err });
   }
 }
