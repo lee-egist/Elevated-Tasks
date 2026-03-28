@@ -58,7 +58,6 @@
   function receiveData(tasks) {
     currentTasks = tasks;
     document.getElementById('loading').classList.add('hidden');
-    populateProjectFilter(tasks);
     applyFiltersAndSort();
   }
 
