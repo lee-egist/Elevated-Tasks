@@ -65,7 +65,7 @@ function include(filename) {
 
 /**
  * Fetches all active users in the Google Workspace directory.
- * Fails gracefully if the user is on a free Gmail account or lacks admin permissions.
+ * Uses the People API so standard, non-admin users can access the company directory.
  */
 function getWorkspaceUsers() {
   const users = [];
@@ -73,29 +73,35 @@ function getWorkspaceUsers() {
   try {
     let pageToken;
     do {
-      // Fetches users from the current Workspace domain
-      const response = AdminDirectory.Users.list({
-        customer: 'my_customer',
-        maxResults: 100,
-        query: "isSuspended=false",
+      // Fetches the public domain profile of coworkers
+      const response = People.People.listDirectoryPeople('directories/my_customer', {
+        readMask: 'names,emailAddresses',
+        sources: 'DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE',
+        pageSize: 100, // Max allowed per page
         pageToken: pageToken
       });
 
-      if (response.users) {
-        response.users.forEach(user => {
-          users.push({
-            email: user.primaryEmail,
-            name: user.name.fullName
-          });
+      if (response.people) {
+        response.people.forEach(person => {
+          // Only add them if they actually have an email address
+          if (person.emailAddresses && person.emailAddresses.length > 0) {
+            const email = person.emailAddresses[0].value;
+            const name = person.names ? person.names[0].displayName : email.split('@')[0];
+            
+            users.push({
+              email: email,
+              name: name
+            });
+          }
         });
       }
       pageToken = response.nextPageToken;
     } while (pageToken);
 
   } catch (err) {
-    console.warn("Could not fetch Workspace directory (likely a personal account or missing permissions): " + err.message);
+    console.warn("Could not fetch Workspace directory: " + err.message);
     
-    // Fallback: Just return the active user so the autocomplete isn't totally broken
+    // Fallback: Just return the active user so the autocomplete isn't empty
     const myEmail = Session.getActiveUser().getEmail();
     users.push({
       email: myEmail,

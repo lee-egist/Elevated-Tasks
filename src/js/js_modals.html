@@ -32,15 +32,33 @@
     if (editSelect) editSelect.innerHTML = optionsHtml;
   }
 
+  // --- NEW PROJECT UI LOGIC ---
   function handleCreateProject() {
-    const projectName = prompt("Enter the name of the new Project:\n(You will automatically be set as the Owner)");
-    if (!projectName || projectName.trim() === "") return;
+    // Open our new custom modal instead of the browser prompt
+    document.getElementById('new-project-name').value = '';
+    document.getElementById('new-project-desc').value = '';
+    document.getElementById('projectModal').style.display = 'flex';
+    document.getElementById('new-project-name').focus();
+  }
 
-    const btns = document.querySelectorAll('button[onclick="handleCreateProject()"]');
-    btns.forEach(b => { b.innerText = "..."; b.disabled = true; });
+  function closeProjectModal() {
+    document.getElementById('projectModal').style.display = 'none';
+  }
+
+  function submitNewProject(ev) {
+    ev.preventDefault();
+    const nameInput = document.getElementById('new-project-name').value.trim();
+    const descInput = document.getElementById('new-project-desc').value.trim();
+
+    if (!nameInput) return;
+
+    const btn = document.getElementById('submitProjectBtn');
+    btn.innerText = "Creating...";
+    btn.disabled = true;
 
     google.script.run
       .withSuccessHandler(function (newProject) {
+        // Update local state and UI
         globalProjects.push(newProject);
         globalProjects.sort((a, b) => a.name.localeCompare(b.name));
         populateProjectDropdowns();
@@ -49,21 +67,26 @@
           renderDashboardProjectFilter(globalProjects);
         }
 
+        // Auto-select the newly created project in whichever modal is currently open
         const addSelect = document.getElementById('add-project');
         const editSelect = document.getElementById('edit-project');
         if (addSelect && document.getElementById('addModal').style.display !== 'none') {
           addSelect.value = newProject.id;
         }
-        if (editSelect && !document.getElementById('editModal').classList.contains('hidden')) {
+        if (editSelect && document.getElementById('editModal').style.display !== 'none') {
           editSelect.value = newProject.id;
         }
-        btns.forEach(b => { b.innerText = "+ New"; b.disabled = false; });
+
+        closeProjectModal();
+        btn.innerText = "Create Project";
+        btn.disabled = false;
       })
       .withFailureHandler(function (err) {
         alert("Failed to create project: " + err.message);
-        btns.forEach(b => { b.innerText = "+ New"; b.disabled = false; });
+        btn.innerText = "Create Project";
+        btn.disabled = false;
       })
-      .createNewProject(projectName); // Ensure this maps to dbCreateProject() on backend
+      .createNewProject(nameInput, descInput);
   }
 
   // --- ADD TASK MODAL ---
@@ -135,6 +158,10 @@
 
     const idField = document.getElementById('edit-task-id');
     if (idField) idField.value = task.id;
+
+    // 👇 ADD THESE TWO LINES TO FIX THE VISIBLE ID:
+    const displayIdField = document.getElementById('display-task-id');
+    if (displayIdField) displayIdField.value = task.id;
 
     const titleField = document.getElementById('edit-title');
     if (titleField) titleField.value = task.title || "";
@@ -352,4 +379,5 @@
     reader.readAsText(file);
     event.target.value = ''; 
   }
+
 </script>
