@@ -14,26 +14,20 @@ function doGet(e) {
 
 /**
  * Called by the Web App to get tasks.
- * Fetches directly from Supabase and maps them for the frontend.
  */
 function getDashboardData() {
   try {
     const supabaseTasks = dbGetTasks();
     if (!supabaseTasks) return [];
 
-    // Map Supabase rows to the format the frontend expects
     return supabaseTasks.map(task => ({
       id: task.id,
       taskListId: "@supabase", // Placeholder to keep the frontend drag-and-drop happy
       title: task.title || "",
       description: task.description || "",
-      parent: null, // Subtasks can be re-added later if needed
-
-      // Because we used 'select=*,projects(name)' in supabase.js, 
-      // the project name is nested inside a 'projects' object!
+      parent: null,
       project: task.projects ? task.projects.name : "",
       project_id: task.project_id || "",
-
       assignee: task.assignee || "",
       status: task.status || "open",
       priority: task.priority || "medium",
@@ -51,10 +45,10 @@ function getDashboardData() {
 
 /**
  * Creates a new task in Supabase
+ * 🛡️ FIXED: Removed legacy taskListId argument!
  */
-function createDashboardTask(taskListId, taskData) {
+function createDashboardTask(taskData) {
   try {
-    // Automatically capture who is creating the task
     const currentUser = Session.getActiveUser().getEmail();
 
     const supabasePayload = {
@@ -67,9 +61,7 @@ function createDashboardTask(taskListId, taskData) {
       type: taskData.type || "general",
       start_date: taskData.start_date ? taskData.start_date : null,
       due_date: taskData.due_date ? taskData.due_date : null,
-
-      // Safety Checks: Ensure they are actual UUIDs before sending to the DB
-      project_id: isValidUUID(taskData.project) ? taskData.project : null,
+      project_id: isValidUUID(taskData.project_id) ? taskData.project_id : null,
       blocked_by: isValidUUID(taskData.blocked_by) ? taskData.blocked_by : null
     };
 
@@ -83,12 +75,12 @@ function createDashboardTask(taskListId, taskData) {
 
 /**
  * Updates just the status (used for Kanban Drag & Drop)
+ * 🛡️ FIXED: Removed legacy taskListId argument!
  */
-function updateDashboardTaskStatus(taskId, taskListId, newStatus) {
+function updateDashboardTaskStatus(taskId, newStatus) {
   try {
     const payload = { status: newStatus };
 
-    // Automation: Automatically stamp completion metrics!
     if (newStatus === 'completed') {
       payload.completed_at = new Date().toISOString();
     }
@@ -105,8 +97,9 @@ function updateDashboardTaskStatus(taskId, taskListId, newStatus) {
 
 /**
  * Updates full task details from the Edit Modal
+ * 🛡️ FIXED: Removed legacy taskListId argument!
  */
-function updateDashboardTaskDetails(taskId, taskListId, updatedData) {
+function updateDashboardTaskDetails(taskId, updatedData) {
   try {
     const payload = {
       title: updatedData.title,
@@ -117,8 +110,7 @@ function updateDashboardTaskDetails(taskId, taskListId, updatedData) {
       type: updatedData.type,
       start_date: updatedData.start_date ? updatedData.start_date : null,
       due_date: updatedData.due_date ? updatedData.due_date : null,
-
-      project_id: isValidUUID(updatedData.project) ? updatedData.project : null,
+      project_id: isValidUUID(updatedData.project_id) ? updatedData.project_id : null,
       blocked_by: isValidUUID(updatedData.blocked_by) ? updatedData.blocked_by : null
     };
 
@@ -178,33 +170,28 @@ function createNewProject(projectName, projectDescription) {
   }
 }
 
-/**
- * One-time migration script.
- * Reads all tasks from the user's default Google Task list, extracts the old ||| metadata, 
- * and injects them cleanly into Supabase.
- */
+// =========================================================================
+// MIGRATION & IMPORT ENDPOINTS
+// =========================================================================
+
 function migrateLegacyGoogleTasks() {
   try {
     let importCount = 0;
     const currentUser = Session.getActiveUser().getEmail();
 
-    // 1. Fetch from the default Google Tasks list
     const tasksResponse = Tasks.Tasks.list('@default', { showHidden: true, maxResults: 100 });
     const items = tasksResponse.items || [];
 
-    // 2. We need your existing Supabase projects so we don't duplicate them
     const existingProjects = dbGetProjects() || [];
     const projectMap = new Map();
     existingProjects.forEach(p => projectMap.set(p.name.toLowerCase(), p.id));
 
     items.forEach(task => {
-      // Skip empty tasks
       if (!task.title || task.title.trim() === "") return;
 
       let description = task.notes || "";
       let metadata = {};
 
-      // Parse the old ||| JSON format
       if (description.includes("|||")) {
         const parts = description.split("|||");
         description = parts[0].trim();
@@ -215,7 +202,6 @@ function migrateLegacyGoogleTasks() {
         }
       }
 
-      // Handle Project mapping (create the project if it doesn't exist yet!)
       let projectId = null;
       let projectName = metadata.project ? metadata.project.trim() : null;
 
@@ -224,37 +210,32 @@ function migrateLegacyGoogleTasks() {
         if (projectMap.has(lowerName)) {
           projectId = projectMap.get(lowerName);
         } else {
-          // Auto-create the project in Supabase so the relational link works!
           const newProject = dbCreateProject({ name: projectName, description: "Imported from Legacy Google Tasks" });
           if (newProject) {
             projectId = newProject.id;
-            projectMap.set(lowerName, newProject.id); // Cache it so we don't create it twice
+            projectMap.set(lowerName, newProject.id);
           }
         }
       }
 
-// 1. Extract and clean the assignee email
       const assigneeEmail = metadata.assignee ? metadata.assignee.toLowerCase() : currentUser;
 
-      // 2. 🛡️ Check: If it's a teammate, create their placeholder and invite them!
       if (assigneeEmail !== currentUser) {
         dbInviteTeammate(assigneeEmail);
       }
 
-      // 3. Build the strict payload for Supabase
       const payload = {
         title: task.title,
         description: description,
         owner: currentUser,
-        assignee: assigneeEmail, // Use the extracted email here!
+        assignee: assigneeEmail,
         status: metadata.status || (task.status === "completed" ? "completed" : "open"),
         priority: metadata.priority || "medium",
         type: metadata.type || "general",
         project_id: projectId,
-        google_task_id: task.id // Save the native ID so we don't lose the link!
+        google_task_id: task.id 
       };
 
-      // Only add dates if they are valid to prevent Supabase crashes
       if (metadata.start_date && !isNaN(new Date(metadata.start_date).getTime())) {
         payload.start_date = new Date(metadata.start_date).toISOString().split('T')[0];
       }
@@ -264,7 +245,6 @@ function migrateLegacyGoogleTasks() {
         payload.due_date = new Date(task.due).toISOString().split('T')[0];
       }
 
-      // Inject to database!
       dbCreateTask(payload);
       importCount++;
     });
@@ -276,13 +256,8 @@ function migrateLegacyGoogleTasks() {
   }
 }
 
-/**
- * Processes a CSV file uploaded from the frontend.
- * Maps columns based on the platform it originated from.
- */
 function processCSVImport(csvContent, platform) {
   try {
-    // Apps Script has a native CSV parser! It turns the string into a 2D array.
     const data = Utilities.parseCsv(csvContent);
     if (data.length < 2) throw new Error("CSV file is empty or missing data rows.");
 
@@ -292,22 +267,15 @@ function processCSVImport(csvContent, platform) {
     const currentUser = Session.getActiveUser().getEmail();
     let importCount = 0;
 
-    // We will need existing projects to map or auto-create them
     const existingProjects = dbGetProjects() || [];
     const projectMap = new Map();
     existingProjects.forEach(p => projectMap.set(p.name.toLowerCase(), p.id));
 
     rows.forEach(row => {
-      // Create a clean object from the CSV row based on headers
       const rowData = {};
       headers.forEach((header, index) => {
         rowData[header] = row[index];
       });
-
-      // ==========================================
-      // THE MAPPING ENGINE
-      // Here is where we translate specific platform jargon to your Supabase schema
-      // ==========================================
 
       // eslint-disable-next-line no-useless-assignment
       let title = "";
@@ -317,40 +285,37 @@ function processCSVImport(csvContent, platform) {
       // eslint-disable-next-line no-useless-assignment
       let projectName = "";
       // eslint-disable-next-line no-useless-assignment
-      let assigneeEmail = null; // 👈 NEW: Default to null
+      let assigneeEmail = null; 
 
       if (platform === 'asana') {
         title = rowData['name'] || "Untitled Asana Task";
         description = rowData['notes'] || "";
         projectName = rowData['projects'] || "";
-        assigneeEmail = rowData['assignee'] || rowData['assignee email'] || null; // 👈 NEW
-        // Asana doesn't use standard statuses often, usually sections
+        assigneeEmail = rowData['assignee'] || rowData['assignee email'] || null; 
       }
       else if (platform === 'trello') {
         title = rowData['card name'] || "Untitled Trello Card";
         description = rowData['card description'] || "";
         projectName = rowData['board name'] || "";
-        status = rowData['list name'] ? "in_progress" : "open"; // Rough guess based on lists
-        assigneeEmail = rowData['members'] || rowData['member'] || null; // 👈 NEW
+        status = rowData['list name'] ? "in_progress" : "open"; 
+        assigneeEmail = rowData['members'] || rowData['member'] || null; 
       }
       else if (platform === 'jira') {
         title = rowData['summary'] || "Untitled Jira Issue";
         description = rowData['description'] || "";
         projectName = rowData['project name'] || "";
         status = (rowData['status'] && rowData['status'].toLowerCase() === 'done') ? 'completed' : 'open';
-        assigneeEmail = rowData['assignee'] || null; // 👈 NEW
+        assigneeEmail = rowData['assignee'] || null; 
       }
       else {
-        // Generic Fallback
         title = rowData['title'] || rowData['name'] || rowData['task'] || "Untitled Task";
         description = rowData['description'] || rowData['notes'] || "";
         projectName = rowData['project'] || "";
-        assigneeEmail = rowData['assignee'] || rowData['email'] || null; // 👈 NEW
+        assigneeEmail = rowData['assignee'] || rowData['email'] || null; 
       }
 
-      if (!title || title.trim() === "") return; // Skip completely blank rows
+      if (!title || title.trim() === "") return;
 
-      // Handle Project UUID mapping
       let projectId = null;
       if (projectName && projectName.trim() !== "") {
         const lowerName = projectName.trim().toLowerCase();
@@ -365,31 +330,25 @@ function processCSVImport(csvContent, platform) {
         }
       }
 
- // 🛡️ NEW: Validate the assignee email and invite them if necessary
       if (assigneeEmail && assigneeEmail.includes('@')) {
         assigneeEmail = assigneeEmail.trim().toLowerCase();
-        
         if (assigneeEmail !== currentUser) {
-          dbInviteTeammate(assigneeEmail); // Creates placeholder and sends email!
+          dbInviteTeammate(assigneeEmail); 
         }
       } else {
-        // If the CSV just said "Bob" instead of "bob@company.com", we must set it to null 
-        // to protect your database's strict email formatting rules.
         assigneeEmail = null; 
       }
 
-      // Build the Supabase Payload
       const payload = {
         title: title,
         description: description,
         owner: currentUser,
-        assignee: assigneeEmail, // 👈 NEW: Add the clean email here!
+        assignee: assigneeEmail, 
         status: status,
         priority: "medium", 
         project_id: projectId
       };
 
-      // Push to Supabase!
       dbCreateTask(payload);
       importCount++;
     });
@@ -402,6 +361,10 @@ function processCSVImport(csvContent, platform) {
   }
 }
 
+// =========================================================================
+// ONBOARDING & TEAM FUNCTIONS
+// =========================================================================
+
 /**
  * Silently ensures the user has a profile so database Foreign Keys don't crash.
  * Flags the profile as "basic" if they haven't filled out the official onboarding form yet.
@@ -409,16 +372,14 @@ function processCSVImport(csvContent, platform) {
 function ensureCurrentUserProfile() {
   try {
     const email = Session.getActiveUser().getEmail().toLowerCase();
-    const defaultName = email.split('@')[0]; // e.g., "erick" from "erick@domain.com"
+    const defaultName = email.split('@')[0]; 
     
     let profile = dbCheckMyProfile();
 
     if (!profile) {
-      // 1. Silently create a basic profile
       profile = dbCreateProfile(defaultName, 40);
       profile.is_basic = true; 
     } else {
-      // 2. If their Display Name is exactly their email prefix, they haven't done the setup yet
       profile.is_basic = (profile.display_name === defaultName || profile.display_name === "Invited User");
     }
 
@@ -426,5 +387,34 @@ function ensureCurrentUserProfile() {
   } catch (err) {
     console.error("Error ensuring profile: " + err);
     throw new Error("Failed to verify user profile: " + err.message, { cause: err });
+  }
+}
+
+/**
+ * 🛡️ RESTORED: Called by the Onboarding Modal to finalize the user's account.
+ */
+function submitUserOnboarding(displayName, weeklyCapacity) {
+  try {
+    if (!displayName || displayName.trim() === "") throw new Error("Display name is required.");
+    
+    // Create or overwrite the pending profile
+    dbCreateProfile(displayName.trim(), parseFloat(weeklyCapacity) || 40);
+    return true;
+  } catch (err) {
+    console.error("Error creating profile: " + err);
+    throw new Error("Failed to create profile: " + err.message, { cause: err });
+  }
+}
+
+/**
+ * 🛡️ RESTORED: Fetches the Google Workspace directory users for the frontend auto-complete.
+ */
+function getWorkspaceDirectoryEmails() {
+  try {
+    const users = getWorkspaceUsers(); 
+    return users.map(u => u.email);
+  } catch (err) {
+    console.warn("Could not fetch workspace directory: " + err);
+    return []; 
   }
 }

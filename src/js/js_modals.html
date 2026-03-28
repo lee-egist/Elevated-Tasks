@@ -1,9 +1,7 @@
 <script>
-
   // --- PROJECT DATA & UI ---
   let globalProjects = [];
 
-  // Fetch projects as soon as the app loads
   window.addEventListener('DOMContentLoaded', fetchProjects);
 
   function fetchProjects() {
@@ -11,8 +9,6 @@
       .withSuccessHandler(function (projects) {
         globalProjects = projects;
         populateProjectDropdowns();
-
-        // Also update the main dashboard filter in js_core!
         if (typeof renderDashboardProjectFilter === 'function') {
           renderDashboardProjectFilter(projects);
         }
@@ -20,7 +16,7 @@
       .withFailureHandler(function (err) {
         console.error("Failed to load projects: ", err);
       })
-      .getDashboardProjects();
+      .getDashboardProjects(); // Assuming this returns dbGetProjects()
   }
 
   function populateProjectDropdowns() {
@@ -29,7 +25,6 @@
 
     let optionsHtml = '<option value="">-- No Project (Unassigned) --</option>';
     globalProjects.forEach(p => {
-      // Remember: The value is now the strict UUID, but the user sees the Name!
       optionsHtml += `<option value="${p.id}">${p.name}</option>`;
     });
 
@@ -37,19 +32,15 @@
     if (editSelect) editSelect.innerHTML = optionsHtml;
   }
 
-  // Handle the "+ New" Button
   function handleCreateProject() {
     const projectName = prompt("Enter the name of the new Project:\n(You will automatically be set as the Owner)");
-
     if (!projectName || projectName.trim() === "") return;
 
-    // Show loading state on the button
     const btns = document.querySelectorAll('button[onclick="handleCreateProject()"]');
     btns.forEach(b => { b.innerText = "..."; b.disabled = true; });
 
     google.script.run
       .withSuccessHandler(function (newProject) {
-        // Add it to our local array and re-render the dropdowns
         globalProjects.push(newProject);
         globalProjects.sort((a, b) => a.name.localeCompare(b.name));
         populateProjectDropdowns();
@@ -58,7 +49,6 @@
           renderDashboardProjectFilter(globalProjects);
         }
 
-        // Auto-select the newly created project in the active modal
         const addSelect = document.getElementById('add-project');
         const editSelect = document.getElementById('edit-project');
         if (addSelect && document.getElementById('addModal').style.display !== 'none') {
@@ -67,14 +57,13 @@
         if (editSelect && !document.getElementById('editModal').classList.contains('hidden')) {
           editSelect.value = newProject.id;
         }
-
         btns.forEach(b => { b.innerText = "+ New"; b.disabled = false; });
       })
       .withFailureHandler(function (err) {
         alert("Failed to create project: " + err.message);
         btns.forEach(b => { b.innerText = "+ New"; b.disabled = false; });
       })
-      .createNewProject(projectName);
+      .createNewProject(projectName); // Ensure this maps to dbCreateProject() on backend
   }
 
   // --- ADD TASK MODAL ---
@@ -104,17 +93,20 @@
     btnEl.innerText = "Creating...";
     btnEl.disabled = true;
 
+    const projectId = document.getElementById('add-project').value;
+    
+    // Explicitly mapping payload keys to Supabase column names
     const newTaskData = {
       title: title,
       description: document.getElementById('add-description').value,
-      project: document.getElementById('add-project').value,
-      assignee: document.getElementById('add-assignee').value,
+      project_id: projectId === "" ? null : projectId,
+      assignee: document.getElementById('add-assignee').value || null,
       priority: document.getElementById('add-priority').value,
       status: "open",
       type: document.getElementById('add-type').value,
-      start_date: document.getElementById('add-start-date').value,
-      due_date: document.getElementById('add-due-date').value,
-      blocked_by: document.getElementById('add-blocked-by').value
+      start_date: document.getElementById('add-start-date').value || null,
+      due_date: document.getElementById('add-due-date').value || null,
+      blocked_by: document.getElementById('add-blocked-by').value || null
     };
 
     google.script.run
@@ -122,41 +114,34 @@
         btnEl.innerText = "Create Task";
         btnEl.disabled = false;
         closeAddModal();
-        loadTasks();
+        loadTasks(); // Fetch fresh data from DB
       })
       .withFailureHandler(function (error) {
         alert("Failed to create task: " + error.message);
         btnEl.innerText = "Create Task";
         btnEl.disabled = false;
       })
-      .createDashboardTask("@default", newTaskData);
+      .createDashboardTask(newTaskData); // REMOVED Google Tasks '@default' arg!
   }
 
-  // --- EDIT TASK MODAL ---
-// --- EDIT MODAL LOGIC ---
+  // --- EDIT MODAL LOGIC ---
   function openEditModal(taskId) {
-    // 1. Find the specific task from your global tasks array
-    // (If your global array is named something besides allTasks or globalTasks, update this!)
-    const task = allTasks.find(t => t.id === taskId || t.google_task_id === taskId);
+    const task = currentTasks.find(t => t.id === taskId);
     
     if (!task) {
       console.error("Task not found for editing!");
       return;
     }
 
-    // 2. Populate the hidden ID field so we know what we are saving later
-    // (Make sure you actually have a hidden input with id="edit-task-id" in your modal_edit.html!)
     const idField = document.getElementById('edit-task-id');
     if (idField) idField.value = task.id;
 
-    // 3. Populate standard text fields
     const titleField = document.getElementById('edit-title');
     if (titleField) titleField.value = task.title || "";
 
     const descField = document.getElementById('edit-description');
     if (descField) descField.value = task.description || "";
 
-    // 4. Populate Dropdowns & Datalists (Notice: No more metadata!)
     const projectField = document.getElementById('edit-project');
     if (projectField) projectField.value = task.project_id || ""; 
 
@@ -168,17 +153,33 @@
 
     const assigneeField = document.getElementById('edit-assignee');
     if (assigneeField) assigneeField.value = task.assignee || "";
+    
+    const typeField = document.getElementById('edit-type');
+    if (typeField) typeField.value = task.type || "general";
+    
+    const startDateField = document.getElementById('edit-start-date');
+    if (startDateField) startDateField.value = task.start_date || "";
+    
+    const dueDateField = document.getElementById('edit-due-date');
+    if (dueDateField) dueDateField.value = task.due_date || "";
+    
+    const blockedByField = document.getElementById('edit-blocked-by');
+    if (blockedByField) blockedByField.value = task.blocked_by || "";
 
-    // 5. Show the modal
     const modal = document.getElementById('editModal');
     if (modal) {
-      // If you are using Tailwind classes for hidden:
       modal.classList.remove('hidden'); 
-      modal.style.display = 'flex'; // Or just standard display toggle
+      modal.style.display = 'flex';
     }
   }
 
-  function closeEditModal() { document.getElementById('editModal').classList.add('hidden'); }
+  function closeEditModal() { 
+    const modal = document.getElementById('editModal');
+    if(modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  }
 
   function saveTaskEdit(ev) {
     ev.preventDefault();
@@ -190,28 +191,37 @@
     text.innerText = "Saving...";
     if (spinner) spinner.classList.remove('hidden');
 
-    const taskId = document.getElementById('edit-taskId').value;
-    const taskListId = document.getElementById('edit-taskListId').value;
+    // UNIFIED ID TRACKING
+    const taskId = document.getElementById('edit-task-id').value;
+    const projectId = document.getElementById('edit-project').value;
+
     const updatedData = {
       title: document.getElementById('edit-title').value,
       description: document.getElementById('edit-description').value,
-      project: document.getElementById('edit-project').value,
-      assignee: document.getElementById('edit-assignee').value,
+      project_id: projectId === "" ? null : projectId,
+      assignee: document.getElementById('edit-assignee').value || null,
       priority: document.getElementById('edit-priority').value,
       status: document.getElementById('edit-status').value,
       type: document.getElementById('edit-type').value,
-      start_date: document.getElementById('edit-start-date').value,
-      due_date: document.getElementById('edit-due-date').value,
-      blocked_by: document.getElementById('edit-blocked-by').value
+      start_date: document.getElementById('edit-start-date').value || null,
+      due_date: document.getElementById('edit-due-date').value || null,
+      blocked_by: document.getElementById('edit-blocked-by').value || null
     };
 
     google.script.run
       .withSuccessHandler(() => {
+        // Quick local state update to make UI feel instant
         const taskIndex = currentTasks.findIndex(t => t.id === taskId);
         if (taskIndex > -1) {
           currentTasks[taskIndex] = { ...currentTasks[taskIndex], ...updatedData };
+          // Inject the project name back into the local object so the UI render doesn't break
+          if(projectId) {
+            const matchedProj = globalProjects.find(p => p.id === projectId);
+            if(matchedProj) currentTasks[taskIndex].projects = { name: matchedProj.name };
+          } else {
+             currentTasks[taskIndex].projects = null;
+          }
         }
-        populateProjectFilter(currentTasks);
         applyFiltersAndSort();
         closeEditModal();
         resetSaveButton(btn, text, spinner);
@@ -220,7 +230,7 @@
         alert("Error saving task: " + err.message);
         resetSaveButton(btn, text, spinner);
       })
-      .updateDashboardTaskDetails(taskId, taskListId, updatedData);
+      .updateDashboardTaskDetails(taskId, updatedData); // REMOVED Google Tasks taskListId!
   }
 
   function resetSaveButton(btn, text, spinner) {
@@ -233,7 +243,7 @@
   let taskPendingDeletion = null;
 
   function handleDeleteFromModal() {
-    const taskId = document.getElementById('edit-taskId').value;
+    const taskId = document.getElementById('edit-task-id').value;
     if (!taskId) return;
     taskPendingDeletion = taskId;
     document.getElementById('deleteModal').style.display = 'flex';
@@ -272,31 +282,20 @@
   function copyTaskId(event) {
     const idInput = document.getElementById('display-task-id');
     const btn = event.currentTarget;
-
-    // Copy to clipboard
     navigator.clipboard.writeText(idInput.value).then(() => {
-      // Visual feedback
       const originalText = btn.innerText;
       btn.innerText = 'Copied!';
       btn.classList.add('bg-green-100', 'text-green-700', 'border-green-200');
-
       setTimeout(() => {
         btn.innerText = originalText;
         btn.classList.remove('bg-green-100', 'text-green-700', 'border-green-200');
       }, 2000);
-    }).catch(err => {
-      alert("Failed to copy text: " + err);
-    });
+    }).catch(err => { alert("Failed to copy text: " + err); });
   }
 
   // --- IMPORT MODAL ---
-  function openImportModal() {
-    document.getElementById('importModal').style.display = 'flex';
-  }
-
-  function closeImportModal() {
-    document.getElementById('importModal').style.display = 'none';
-  }
+  function openImportModal() { document.getElementById('importModal').style.display = 'flex'; }
+  function closeImportModal() { document.getElementById('importModal').style.display = 'none'; }
 
   function runGoogleTasksMigration(btnElement) {
     const originalHtml = btnElement.innerHTML;
@@ -309,7 +308,7 @@
         closeImportModal();
         btnElement.innerHTML = originalHtml;
         btnElement.disabled = false;
-        loadTasks(); // Refresh the board!
+        loadTasks(); 
       })
       .withFailureHandler((err) => {
         alert("Migration failed: " + err.message);
@@ -319,34 +318,30 @@
       .migrateLegacyGoogleTasks();
   }
 
-// --- CSV UPLOAD HANDLING ---
+  // --- CSV UPLOAD HANDLING ---
   let selectedPlatform = 'generic';
 
   function triggerCSVUpload(platform) {
     selectedPlatform = platform;
-    document.getElementById('csvFileInput').click(); // Opens the hidden file browser
+    document.getElementById('csvFileInput').click();
   }
 
   function handleCSVSelection(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Show the progress UI
     document.getElementById('csvUploadProgress').classList.remove('hidden');
     document.getElementById('csvUploadStatus').innerText = `Uploading ${file.name} to server...`;
 
-    // Read the file as text
     const reader = new FileReader();
     reader.onload = function(e) {
       const csvContent = e.target.result;
-      
-      // Send the raw CSV text and the platform name to our backend parser
       google.script.run
         .withSuccessHandler(function(result) {
           document.getElementById('csvUploadProgress').classList.add('hidden');
           alert(`Success! Imported ${result.count} tasks from ${selectedPlatform}.`);
           closeImportModal();
-          loadTasks(); // Refresh your dashboard
+          loadTasks(); 
         })
         .withFailureHandler(function(err) {
           document.getElementById('csvUploadProgress').classList.add('hidden');
@@ -354,11 +349,7 @@
         })
         .processCSVImport(csvContent, selectedPlatform);
     };
-    
     reader.readAsText(file);
-    
-    // Clear the input so they can upload the same file again if it failed
     event.target.value = ''; 
   }
-  
 </script>

@@ -1,9 +1,5 @@
 <script>
-
-    // --- HELPERS ---
-  /**
-   * Looks up a task by its ID and returns its title.
-   */
+  // --- HELPERS ---
   function getTaskTitleById(taskId) {
     if (!taskId) return '';
     const task = currentTasks.find(t => t.id === taskId);
@@ -11,8 +7,6 @@
   }
 
   // --- UI RENDERERS ---
-  
-  // Notice the new criticalPathIds parameter
   function renderBoard(tasksToRender, criticalPathIds = []) {
     const statuses = ['open', 'in_progress', 'blocked', 'completed'];
     statuses.forEach(status => {
@@ -26,8 +20,6 @@
 
     tasksToRender.forEach(task => {
       const card = document.createElement('div');
-      
-      // --- NEW: Check if task is on Critical Path ---
       const isCritical = criticalPathIds.includes(task.id);
       
       card.className = `task-card bg-white p-4 rounded-lg shadow-sm border hover:shadow-md group relative ${
@@ -36,8 +28,7 @@
       
       card.draggable = true;
       card.id = `task-${task.id}`;
-      card.dataset.taskId = task.id;
-      card.dataset.taskListId = task.taskListId;
+      card.dataset.taskId = task.id; // STRICTLY USING UUID
       card.ondragstart = dragStart;
       card.ondragend = dragEnd;
       
@@ -50,6 +41,9 @@
 
       if (isSubtask) card.classList.add('ml-6', 'border-l-4', 'border-l-blue-300');
 
+      // Safely grab the joined Project Name from Supabase
+      const displayProjectName = (task.projects && task.projects.name) ? task.projects.name : 'No Project';
+
       card.innerHTML = `
         <div class="flex justify-between items-start mb-1 gap-2">
           <div class="font-medium text-gray-900 leading-tight">${criticalBadge}${titlePrefix}${task.title}</div>
@@ -59,12 +53,12 @@
         </div>
         <div class="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-          ${task.project || 'No Project'} &bull; ${typeDisplay}
+          ${displayProjectName} • ${typeDisplay}
         </div>
         ${task.due_date || task.blocked_by ? `
         <div class="text-xs text-gray-500 mb-3 space-y-1 bg-gray-50 p-2 rounded border border-gray-100">
           ${task.due_date ? `<div class="flex items-center gap-1"><span>📅</span> Due: ${dueDateDisplay}</div>` : ''}
-          ${task.blocked_by ? `<div class="flex items-center gap-1 text-red-500 font-medium truncate" title="ID: ${task.blocked_by}"><span>🚫</span> Blocked by: ${getTaskTitleById(task.blocked_by)}</div>` : ''}
+          ${task.blocked_by ? `<div class="flex items-center gap-1 text-red-500 font-medium truncate" title="ID: ${task.blocked_by}"><span>🛑</span> Blocked by: ${getTaskTitleById(task.blocked_by)}</div>` : ''}
         </div>
         ` : '<div class="mb-3"></div>'}
         <div class="flex justify-between items-end text-xs">
@@ -97,17 +91,13 @@
     
     tasksToRender.forEach(task => {
       const isCritical = criticalPathIds.includes(task.id);
-      
       const tr = document.createElement('tr');
-      // Give the table row a slight red tint if it's on the critical path
       tr.className = isCritical ? "bg-red-50 hover:bg-red-100 transition-colors" : "hover:bg-gray-50 transition-colors";
       
       const dueDateDisplay = task.due_date ? new Date(task.due_date).toLocaleDateString() : '-';
       const typeDisplay = task.type ? task.type.charAt(0).toUpperCase() + task.type.slice(1) : 'General';
       const isSubtask = !!task.parent;
       const titlePrefix = isSubtask ? '<span class="text-gray-400 font-bold mr-2 ml-6">↳</span>' : '';
-      
-      // Add a small flame icon next to the title in the table
       const criticalIcon = isCritical ? '<span title="Critical Path" class="mr-1">🔥</span>' : '';
       
       let statusDisplay = 'Open';
@@ -115,8 +105,8 @@
       if (task.status === 'blocked') statusDisplay = 'Blocked';
       if (task.status === 'completed') statusDisplay = 'Completed';
       
-
-      const blockedDisplay = task.blocked_by ? `<div class="text-xs text-red-500 font-medium mt-1 ${isSubtask ? 'ml-10' : ''}">🚫 Blocked by: ${getTaskTitleById(task.blocked_by)}</div>` : '';
+      const blockedDisplay = task.blocked_by ? `<div class="text-xs text-red-500 font-medium mt-1 ${isSubtask ? 'ml-10' : ''}">🛑 Blocked by: ${getTaskTitleById(task.blocked_by)}</div>` : '';
+      const displayProjectName = (task.projects && task.projects.name) ? task.projects.name : '-';
 
       tr.innerHTML = `
         <td class="px-6 py-4 whitespace-nowrap">
@@ -124,9 +114,8 @@
           <div class="text-xs text-gray-500 ${isSubtask ? 'ml-10' : ''}">${typeDisplay}</div>
           ${blockedDisplay}
         </td>
-      
         <td class="px-6 py-4 whitespace-nowrap"><span class="px-2 py-1 text-xs rounded-full font-medium ${getTableStatusStyle(task.status)}">${statusDisplay}</span></td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.project || '-'}</td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${displayProjectName}</td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${task.assignee || '-'}</td>
         <td class="px-6 py-4 whitespace-nowrap"><span class="${getPriorityStyle(task.priority)} px-2 py-1 rounded-md text-xs font-semibold capitalize border">${task.priority || 'None'}</span></td>
         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${dueDateDisplay}</td>
@@ -158,7 +147,6 @@
   // --- DRAG AND DROP ---
   function dragStart(ev) {
     ev.dataTransfer.setData("taskId", ev.target.dataset.taskId);
-    ev.dataTransfer.setData("taskListId", ev.target.dataset.taskListId);
     ev.dataTransfer.effectAllowed = "move";
     setTimeout(() => ev.target.classList.add('dragging'), 0);
   }
@@ -182,14 +170,13 @@
     if (column) column.classList.remove('drag-over');
 
     const taskId = ev.dataTransfer.getData("taskId");
-    const taskListId = ev.dataTransfer.getData("taskListId");
-    
     const taskObjIndex = currentTasks.findIndex(t => t.id === taskId);
+    
     if (taskObjIndex > -1) {
       currentTasks[taskObjIndex].status = newStatus;
       applyFiltersAndSort(); 
-      google.script.run.updateDashboardTaskStatus(taskId, taskListId, newStatus);
+      // Ensure your backend function updateDashboardTaskStatus handles just (taskId, newStatus) now!
+      google.script.run.updateDashboardTaskStatus(taskId, newStatus); 
     }
   }
-  
 </script>

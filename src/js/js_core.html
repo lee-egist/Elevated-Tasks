@@ -1,15 +1,14 @@
 <script>
-
   // --- GLOBALS & STARTUP SEQUENCE ---
   let currentUserProfile = null;
+  let currentTasks = [];    // SINGLE SOURCE OF TRUTH FOR TASKS
+  let currentView = 'board'; 
+  const priorityWeights = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1, '': 0 };
 
-  // Wait for the HTML to finish loading, then check the profile and fetch data
   window.addEventListener('DOMContentLoaded', function () {
     google.script.run
       .withSuccessHandler(function (profile) {
         currentUserProfile = profile;
-
-        // Fetch your actual dashboard data (update these names if yours are different!)
         if (typeof fetchProjects === 'function') fetchProjects();
         if (typeof loadTasks === 'function') loadTasks();
       })
@@ -24,23 +23,14 @@
   // --- JUST-IN-TIME ONBOARDING INTERCEPTOR ---
   function requireCompleteProfile(element) {
     if (currentUserProfile && currentUserProfile.is_basic) {
-      if (element) element.blur(); // Stop them from typing
-
+      if (element) element.blur(); 
       const modalHeader = document.querySelector('#onboardingModal h2');
       const modalSubtext = document.querySelector('#onboardingModal p');
       if (modalHeader) modalHeader.innerText = "Team Feature Unlocked!";
       if (modalSubtext) modalSubtext.innerText = "Before you can assign tasks to others, please complete your profile.";
-
       document.getElementById('onboardingModal').style.display = 'flex';
     }
   }
-  // --- STATE & CONFIG ---
-  let currentTasks = [];
-  let currentView = 'board'; // Default View
-  const priorityWeights = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1, '': 0 };
-
-  // Initial Load
-  window.onload = loadTasks;
 
   // --- API COMMUNICATION ---
   function loadTasks() {
@@ -52,7 +42,7 @@
     google.script.run
       .withSuccessHandler(receiveData)
       .withFailureHandler(showError)
-      .getDashboardData();
+      .getDashboardData(); // Assuming this returns dbGetTasks()
   }
 
   function receiveData(tasks) {
@@ -80,22 +70,19 @@
     applyFiltersAndSort();
   }
 
-  // --- UPDATED DASHBOARD FILTER ---
   function renderDashboardProjectFilter(projects) {
     const projectSelect = document.getElementById('filter-project');
     if (!projectSelect) return;
 
     const currentSelection = projectSelect.value;
-
-    // We use the UUID as the value now!
     let optionsHtml = '<option value="all">All Projects</option><option value="unassigned">No Project</option>';
+    
     projects.forEach(p => {
       optionsHtml += `<option value="${p.id}">${p.name}</option>`;
     });
 
     projectSelect.innerHTML = optionsHtml;
 
-    // Attempt to restore their previous selection if it still exists
     const exists = projects.some(p => p.id === currentSelection);
     if (currentSelection === 'unassigned' || exists) {
       projectSelect.value = currentSelection;
@@ -104,14 +91,12 @@
     }
   }
 
-  // --- NEW: CRITICAL PATH ALGORITHM ---
   function calculateCriticalPath(tasks) {
     const activeTasks = tasks.filter(t => t.status !== 'completed');
     const adjList = {};
 
     activeTasks.forEach(t => adjList[t.id] = []);
     activeTasks.forEach(t => {
-      // If t is blocked by another active task, create a path: blocker -> t
       if (t.blocked_by && adjList[t.blocked_by]) {
         adjList[t.blocked_by].push(t.id);
       }
@@ -121,7 +106,7 @@
     const memo = {};
 
     function dfs(nodeId, currentPathVisited) {
-      if (currentPathVisited.has(nodeId)) return []; // Cycle detected (safety catch)
+      if (currentPathVisited.has(nodeId)) return []; 
       if (memo[nodeId]) return memo[nodeId];
 
       currentPathVisited.add(nodeId);
@@ -161,30 +146,36 @@
       if (statusFilter !== 'all' && task.status !== statusFilter) return false;
       if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
 
-      const taskProject = (task.project || '').trim();
+      // STRICT UUID FILTERING FOR SUPABASE
+      const taskProjectId = task.project_id || 'unassigned';
       if (projectFilter !== 'all') {
-        if (projectFilter === 'unassigned' && taskProject !== '') return false;
-        if (projectFilter !== 'unassigned' && taskProject !== projectFilter) return false;
+        if (projectFilter !== taskProjectId) return false;
       }
 
       if (searchText) {
         const matchesTitle = (task.title || '').toLowerCase().includes(searchText);
         const matchesDesc = (task.description || '').toLowerCase().includes(searchText);
         const matchesAssignee = (task.assignee || '').toLowerCase().includes(searchText);
-        const matchesProject = taskProject.toLowerCase().includes(searchText);
+        // Safely extract the joined project name from Supabase
+        const projectName = (task.projects && task.projects.name) ? task.projects.name.toLowerCase() : '';
+        const matchesProject = projectName.includes(searchText);
+        
         if (!matchesTitle && !matchesDesc && !matchesAssignee && !matchesProject) return false;
       }
       return true;
     });
 
     processedTasks.sort((a, b) => {
+      const projA = (a.projects && a.projects.name) ? a.projects.name : '';
+      const projB = (b.projects && b.projects.name) ? b.projects.name : '';
+      
       switch (sortBy) {
         case 'dueDateAsc': return (a.due_date ? new Date(a.due_date) : Infinity) - (b.due_date ? new Date(b.due_date) : Infinity);
         case 'dueDateDesc': return (b.due_date ? new Date(b.due_date) : 0) - (a.due_date ? new Date(a.due_date) : 0);
         case 'priorityDesc': return (priorityWeights[b.priority || ''] || 0) - (priorityWeights[a.priority || ''] || 0);
         case 'priorityAsc': return (priorityWeights[a.priority || ''] || 0) - (priorityWeights[b.priority || ''] || 0);
         case 'titleAsc': return (a.title || '').localeCompare(b.title || '');
-        case 'projectAsc': return (a.project || '').localeCompare(b.project || '');
+        case 'projectAsc': return projA.localeCompare(projB);
         default: return 0;
       }
     });
@@ -195,15 +186,10 @@
       document.getElementById('table-view').classList.add('hidden');
       document.getElementById('no-results').classList.remove('hidden');
     } else {
-
-      // --- NEW: Calculate Critical Path ---
       let criticalPathIds = [];
-      // Usually, it only makes sense to highlight the critical path if viewing a specific project
       if (projectFilter !== 'all' && projectFilter !== 'unassigned') {
         criticalPathIds = calculateCriticalPath(processedTasks);
       }
-
-      // Pass the IDs to the renderers
       renderBoard(processedTasks, criticalPathIds);
       renderTable(processedTasks, criticalPathIds);
       switchView(currentView);
@@ -228,5 +214,4 @@
       if (!noResults) { tableContainer.classList.remove('hidden'); boardContainer.classList.add('hidden'); }
     }
   }
-
 </script>
