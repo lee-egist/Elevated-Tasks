@@ -17,7 +17,7 @@ export default [
         ...globals.browser,
         ...globals.node,
         ...globals.jest,
-        ...globals.googleappsscripts,
+        ...globals.googleappsscript,
         // Essential Google Apps Script Globals
         SpreadsheetApp: "readonly",
         DriveApp: "readonly",
