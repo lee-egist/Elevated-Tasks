@@ -1,21 +1,46 @@
+// @ts-check
+
 /**
- * supabase.js
- * Handles all secure communication between Google Apps Script and Supabase via REST API.
+ * @typedef {Object} SupabaseTaskPayload
+ * @property {string} [title]
+ * @property {string} [description]
+ * @property {string} [owner]
+ * @property {string|null} [assignee]
+ * @property {string} [status]
+ * @property {string} [priority]
+ * @property {string} [type]
+ * @property {string|null} [start_date]
+ * @property {string|null} [due_date]
+ * @property {string|null} [project_id]
+ * @property {string|null} [blocked_by]
+ * @property {string} [completed_at]
+ * @property {string} [started_at]
+ * @property {string} [google_task_id]
  */
 
-// --- CORE FETCH WRAPPER ---
+/**
+ * @typedef {Object} SupabaseProjectPayload
+ * @property {string} name
+ * @property {string} [description]
+ * @property {string} [owner_email]
+ * @property {string} [status]
+ */
+
+/**
+ * @returns {Object.<string, string>}
+ */
 function getSupabaseHeaders() {
   const props = PropertiesService.getScriptProperties();
   const serviceKey = props.getProperty('SUPABASE_SERVICE_KEY');
-  const anonKey = props.getProperty('SUPABASE_ANON_KEY'); // Fetch the new public key
+  const anonKey = props.getProperty('SUPABASE_ANON_KEY'); 
   
   if (!serviceKey || !anonKey) {
-    throw new Error("Missing Supabase keys in Script Properties. Ensure both SUPABASE_SERVICE_KEY and SUPABASE_ANON_KEY are set.");
+    throw new Error("Missing Supabase keys in Script Properties.");
   }
 
   return {
-    "apikey": anonKey,                       // Gets us past the API Gateway browser check
-    "Authorization": "Bearer " + serviceKey, // Gives us backend "God mode" in the database
+    "apikey": anonKey,
+    "Authorization": "Bearer " + serviceKey,
     "Content-Type": "application/json",
     "Prefer": "return=representation" 
   };
@@ -23,19 +48,24 @@ function getSupabaseHeaders() {
 
 /**
  * Universal request handler for Supabase API
+ * @param {'GET'|'POST'|'PATCH'|'DELETE'} method 
+ * @param {string} endpoint 
+ * @param {Object|null} [payload=null] 
+ * @returns {any}
  */
 function supabaseRequest(method, endpoint, payload = null) {
   const props = PropertiesService.getScriptProperties();
   const baseUrl = props.getProperty('SUPABASE_URL');
   
-  if (!baseUrl) throw new Error("Missing SUPABASE_URL in Script Properties.");
+  if (!baseUrl) throw new Error("Missing SUPABASE_URL.");
 
   const url = `${baseUrl}/rest/v1/${endpoint}`;
   
+  /** @type {GoogleAppsScript.URL_Fetch.URLFetchRequestOptions} */
   const options = {
     method: method,
     headers: getSupabaseHeaders(),
-    muteHttpExceptions: true // Allows us to read the error message from Supabase instead of instantly crashing
+    muteHttpExceptions: true 
   };
 
   if (payload) {
@@ -46,7 +76,6 @@ function supabaseRequest(method, endpoint, payload = null) {
   const responseCode = response.getResponseCode();
   const responseText = response.getContentText();
 
-  // Supabase returns 200-299 for success
   if (responseCode >= 200 && responseCode < 300) {
     return responseText ? JSON.parse(responseText) : null;
   } else {
@@ -58,24 +87,25 @@ function supabaseRequest(method, endpoint, payload = null) {
 // --- TASK API FUNCTIONS ---
 
 /**
- * Fetches all tasks. 
- * Because we use foreign keys, 'select=*,projects(name)' automatically joins 
- * the project name directly into the task data!
+ * @returns {any[]}
  */
 function dbGetTasks() {
   return supabaseRequest('GET', 'tasks?select=*,projects(name)&order=created_at.desc');
 }
 
 /**
- * Creates a new task in Supabase.
+ * @param {SupabaseTaskPayload} taskData 
+ * @returns {any}
  */
 function dbCreateTask(taskData) {
   const res = supabaseRequest('POST', 'tasks', taskData);
-  return res ? res[0] : null; // Supabase returns an array, we want the first object
+  return res ? res[0] : null; 
 }
 
 /**
- * Updates an existing task by its UUID.
+ * @param {string} taskId 
+ * @param {SupabaseTaskPayload} taskData 
+ * @returns {any}
  */
 function dbUpdateTask(taskId, taskData) {
   const res = supabaseRequest('PATCH', `tasks?id=eq.${taskId}`, taskData);
@@ -83,7 +113,8 @@ function dbUpdateTask(taskId, taskData) {
 }
 
 /**
- * Deletes a task by its UUID.
+ * @param {string} taskId 
+ * @returns {any}
  */
 function dbDeleteTask(taskId) {
   return supabaseRequest('DELETE', `tasks?id=eq.${taskId}`);
@@ -91,23 +122,16 @@ function dbDeleteTask(taskId) {
 
 // --- PROJECT API FUNCTIONS ---
 
-// --- PROJECT API FUNCTIONS ---
-
 /**
- * Fetches projects where the active user is either the OWNER or an EDITOR.
+ * @returns {any[]}
  */
 function dbGetProjects() {
   const userEmail = Session.getActiveUser().getEmail();
   const encodedEmail = encodeURIComponent(userEmail);
 
-  // 1. Get projects where the user is the absolute owner
   const ownedProjects = supabaseRequest('GET', `projects?owner_email=eq.${encodedEmail}&select=id,name`);
-
-  // 2. Get projects from the junction table where the user has 'edit' access.
-  // The 'select=projects(id,name)' part tells Supabase to grab the project details through the Foreign Key!
   const memberProjects = supabaseRequest('GET', `project_members?user_email=eq.${encodedEmail}&access_level=eq.edit&select=projects(id,name)`);
 
-  // 3. Combine them and remove any duplicates using a Map
   const projectMap = new Map();
 
   if (ownedProjects) {
@@ -116,20 +140,18 @@ function dbGetProjects() {
 
   if (memberProjects) {
     memberProjects.forEach(pm => {
-      // Because we fetched through the junction table, the data is nested inside 'projects'
       if (pm.projects) {
         projectMap.set(pm.projects.id, { id: pm.projects.id, name: pm.projects.name });
       }
     });
   }
 
-  // Convert the Map back to an array and sort alphabetically
   return Array.from(projectMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
- * Creates a new project in the database.
- * Automatically sets the active user as the absolute owner.
+ * @param {SupabaseProjectPayload} projectData 
+ * @returns {any}
  */
 function dbCreateProject(projectData) {
   const userEmail = Session.getActiveUser().getEmail();
@@ -138,15 +160,17 @@ function dbCreateProject(projectData) {
     name: projectData.name,
     description: projectData.description || "",
     owner_email: userEmail,
-    status: "active" // Default new projects to active
+    status: "active" 
   };
 
   const res = supabaseRequest('POST', 'projects', payload);
   return res ? res[0] : null;
 }
 
+// --- USER PROFILE API FUNCTIONS ---
+
 /**
- * Checks if the current active user has a profile.
+ * @returns {any|null}
  */
 function dbCheckMyProfile() {
   const email = Session.getActiveUser().getEmail().toLowerCase();
@@ -159,7 +183,9 @@ function dbCheckMyProfile() {
 }
 
 /**
- * Creates a brand new user profile (Used during Onboarding)
+ * @param {string} displayName 
+ * @param {number} weeklyCapacity 
+ * @returns {any}
  */
 function dbCreateProfile(displayName, weeklyCapacity) {
   const email = Session.getActiveUser().getEmail().toLowerCase();
@@ -175,24 +201,32 @@ function dbCreateProfile(displayName, weeklyCapacity) {
 }
 
 /**
- * Creates a placeholder profile for a teammate and emails them an invite.
+ * @param {string} email 
+ * @param {Object} profileData 
+ * @returns {any}
+ */
+function dbUpdateProfile(email, profileData) {
+  const safeEmail = encodeURIComponent(email.toLowerCase());
+  return supabaseRequest('PATCH', `user_profiles?email=eq.${safeEmail}`, profileData);
+}
+
+/**
+ * @param {string} teammateEmail 
+ * @returns {void}
  */
 function dbInviteTeammate(teammateEmail) {
   const cleanEmail = teammateEmail.trim().toLowerCase();
   const currentUser = Session.getActiveUser().getEmail();
   
-  // 1. Check if they already exist
   const existing = supabaseRequest('GET', `user_profiles?email=eq.${encodeURIComponent(cleanEmail)}`);
-  if (existing && existing.length > 0) return; // They already exist, do nothing!
+  if (existing && existing.length > 0) return; 
 
-  // 2. Create the placeholder profile (so your database foreign keys don't break!)
   supabaseRequest('POST', 'user_profiles', {
     email: cleanEmail,
     display_name: "Invited User",
-    role: "pending" // You can use this later to show "Pending" badges in the UI
+    role: "pending" 
   });
 
-  // 3. Send them an actual email invite!
   const webAppUrl = ScriptApp.getService().getUrl(); 
   const subject = `You've been invited to Elevated Tasks by ${currentUser}`;
   const body = `
@@ -211,12 +245,4 @@ function dbInviteTeammate(teammateEmail) {
   } catch (err) {
     console.warn("Could not send invite email to " + cleanEmail + " error: " + err.message);
   }
-}
-
-/**
- * Updates an existing user profile by their email address.
- */
-function dbUpdateProfile(email, profileData) {
-  const safeEmail = encodeURIComponent(email.toLowerCase());
-  return supabaseRequest('PATCH', `user_profiles?email=eq.${safeEmail}`, profileData);
 }

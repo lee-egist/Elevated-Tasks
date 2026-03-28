@@ -1,15 +1,25 @@
-/**
- * utils.js
- * Contains shared constants and helper functions used across the project.
- * Upgraded to the Bulletproof Metadata Engine.
- */
+// @ts-check
 
 const CONFIG = {
   DELIMITER: "|||" 
 };
 
 /**
+ * @typedef {Object} TaskMetadata
+ * @property {string} status
+ * @property {string} priority
+ * @property {string} project
+ * @property {string} assignee
+ * @property {string} type
+ * @property {string} blocked_by
+ * @property {string} [start_date]
+ * @property {string} [due_date]
+ */
+
+/**
  * Extracts and parses the JSON metadata object from the top of the notes string.
+ * @param {string} rawNotes 
+ * @returns {TaskMetadata}
  */
 function parseMetadata(rawNotes) {
   const defaultMetadata = { status: 'open', priority: 'medium', project: '', assignee: '', type: 'general', blocked_by: '' };
@@ -21,7 +31,7 @@ function parseMetadata(rawNotes) {
     const parsedData = JSON.parse(parts[0].trim());
     return { ...defaultMetadata, ...parsedData };
   } catch (err) {
-    // If it fails (e.g., user deleted the JSON on their phone), return defaults
+    // @ts-ignore
     console.warn("Failed to parse metadata" + err.message);
     return defaultMetadata;
   }
@@ -29,20 +39,22 @@ function parseMetadata(rawNotes) {
 
 /**
  * Strips out the hidden metadata block to return only the human-written notes.
+ * @param {string} rawNotes 
+ * @returns {string}
  */
 function getCleanNotes(rawNotes) {
   if (!rawNotes || !rawNotes.includes(CONFIG.DELIMITER)) return rawNotes || "";
-  
-  // The human notes are everything AFTER the delimiter
   const parts = rawNotes.split(CONFIG.DELIMITER);
   return parts.length > 1 ? parts.slice(1).join(CONFIG.DELIMITER).trim() : "";
 }
 
 /**
  * Combines JSON metadata and human notes safely.
+ * @param {string} userNotes 
+ * @param {Partial<TaskMetadata>} metadataObj 
+ * @returns {string}
  */
 function buildElevatedNotes(userNotes, metadataObj) {
-  // Clean out empty properties so we don't waste character space
   const cleanObj = Object.fromEntries(
     Object.entries(metadataObj).filter(([_, v]) => v != null && v !== '')
   );
@@ -51,57 +63,57 @@ function buildElevatedNotes(userNotes, metadataObj) {
   const safeNotes = userNotes || "";
   
   if (!safeNotes.trim()) return jsonString;
-  
-  // Put JSON on top, human notes on bottom
   return `${jsonString} ${CONFIG.DELIMITER}\n\n${safeNotes.trim()}`;
 }
 
 /**
  * Helper function to include HTML/CSS/JS files inside other HTML files.
+ * @param {string} filename 
+ * @returns {string}
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
 /**
+ * @typedef {Object} WorkspaceUser
+ * @property {string} email
+ * @property {string} name
+ */
+
+/**
  * Fetches all active users in the Google Workspace directory.
- * Uses the People API so standard, non-admin users can access the company directory.
+ * @returns {WorkspaceUser[]}
  */
 function getWorkspaceUsers() {
+  /** @type {WorkspaceUser[]} */
   const users = [];
   
   try {
     let pageToken;
     do {
-      // Fetches the public domain profile of coworkers
-      const response = People.People.listDirectoryPeople('directories/my_customer', {
-        readMask: 'names,emailAddresses',
-        sources: 'DIRECTORY_SOURCE_TYPE_DOMAIN_PROFILE',
-        pageSize: 100, // Max allowed per page
+      // @ts-ignore - AdminDirectory is an advanced service, types can be finicky
+      const response = AdminDirectory.Users.list({
+        customer: 'my_customer',
+        maxResults: 100,
+        query: "isSuspended=false",
         pageToken: pageToken
       });
 
-      if (response.people) {
-        response.people.forEach(person => {
-          // Only add them if they actually have an email address
-          if (person.emailAddresses && person.emailAddresses.length > 0) {
-            const email = person.emailAddresses[0].value;
-            const name = person.names ? person.names[0].displayName : email.split('@')[0];
-            
-            users.push({
-              email: email,
-              name: name
-            });
-          }
+      if (response.users) {
+        response.users.forEach((/** @type {{ primaryEmail: any; name: { fullName: any; }; }} */ user) => {
+          users.push({
+            email: user.primaryEmail,
+            name: user.name.fullName
+          });
         });
       }
       pageToken = response.nextPageToken;
     } while (pageToken);
 
   } catch (err) {
+    // @ts-ignore
     console.warn("Could not fetch Workspace directory: " + err.message);
-    
-    // Fallback: Just return the active user so the autocomplete isn't empty
     const myEmail = Session.getActiveUser().getEmail();
     users.push({
       email: myEmail,

@@ -50,6 +50,9 @@ jobs:
       - name: Run Linter
         run: npx eslint src/
 
+      - name: Run Unit Tests
+        run: npm run test
+
       - name: Push to Google
         run: clasp push -f
 

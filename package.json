@@ -1,6 +1,13 @@
 {
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.0.3"
+    "@types/google-apps-script": "^2.0.8",
+    "eslint": "^10.0.3",
+    "eslint-plugin-jest": "^29.15.1",
+    "jest": "^30.3.0"
+  },
+  "scripts": {
+    "test": "jest",
+    "lint": "eslint ."
   }
 }

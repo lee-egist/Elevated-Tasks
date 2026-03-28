@@ -1,13 +1,19 @@
 import js from "@eslint/js";
+import jest from "eslint-plugin-jest";
+
 
 export default [
   js.configs.recommended,
   {
-    files: ["src/**/*.js", "src/**/*.gs"],
+    files: ["src/**/*.test.js", "src/**/*.gs"],
+    plugins: {
+      jest,
+    },
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "script",
       globals: {
+        ...globals.jest,
         // Essential Google Apps Script Globals
         SpreadsheetApp: "readonly",
         DriveApp: "readonly",
