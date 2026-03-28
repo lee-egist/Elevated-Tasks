@@ -14,10 +14,10 @@ const config = {
   ],
   coverageThreshold: {
     global: {
-      branches: 0,
-      functions: 0,
-      lines: 0,
-      statements: 0
+      branches: 90,
+      functions: 100,
+      lines: 95,
+      statements: 100
     }
   },
 
@@ -26,4 +26,22 @@ const config = {
   transform: {} // Not needed unless using Babel/TypeScript
 };
 
-module.exports = config;
+module.exports = {
+  collectCoverage: true,
+  collectCoverageFrom: [
+    "src/**/*.{js,gs}",
+    "!src/tests/**",        // Don't measure coverage of the tests themselves
+    "!**/node_modules/**"
+  ],
+  coverageThreshold: {
+    global: {
+      statements: 100,
+      branches: 100,
+      functions: 100,
+      lines: 100
+    }
+  },
+  testEnvironment: "node",
+  // This helps Jest handle the fact that GAS files sometimes don't have extensions
+  moduleFileExtensions: ["js", "gs", "json"]
+};

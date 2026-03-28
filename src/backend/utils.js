@@ -123,3 +123,13 @@ function getWorkspaceUsers() {
   
   return users;
 }
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    parseMetadata,
+    getCleanNotes,
+    buildElevatedNotes,
+    include,
+    getWorkspaceUsers
+  };
+}

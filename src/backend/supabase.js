@@ -48,7 +48,7 @@ function getSupabaseHeaders() {
 
 /**
  * Universal request handler for Supabase API
- * @param {'GET'|'POST'|'PATCH'|'DELETE'} method 
+ * @param {'get'|'post'|'patch'|'delete'} method 
  * @param {string} endpoint 
  * @param {Object|null} [payload=null] 
  * @returns {any}
@@ -90,7 +90,7 @@ function supabaseRequest(method, endpoint, payload = null) {
  * @returns {any[]}
  */
 function dbGetTasks() {
-  return supabaseRequest('GET', 'tasks?select=*,projects(name)&order=created_at.desc');
+  return supabaseRequest('get', 'tasks?select=*,projects(name)&order=created_at.desc');
 }
 
 /**
@@ -98,7 +98,7 @@ function dbGetTasks() {
  * @returns {any}
  */
 function dbCreateTask(taskData) {
-  const res = supabaseRequest('POST', 'tasks', taskData);
+  const res = supabaseRequest('post', 'tasks', taskData);
   return res ? res[0] : null; 
 }
 
@@ -108,7 +108,7 @@ function dbCreateTask(taskData) {
  * @returns {any}
  */
 function dbUpdateTask(taskId, taskData) {
-  const res = supabaseRequest('PATCH', `tasks?id=eq.${taskId}`, taskData);
+  const res = supabaseRequest('patch', `tasks?id=eq.${taskId}`, taskData);
   return res ? res[0] : null;
 }
 
@@ -117,7 +117,7 @@ function dbUpdateTask(taskId, taskData) {
  * @returns {any}
  */
 function dbDeleteTask(taskId) {
-  return supabaseRequest('DELETE', `tasks?id=eq.${taskId}`);
+  return supabaseRequest('delete', `tasks?id=eq.${taskId}`);
 }
 
 // --- PROJECT API FUNCTIONS ---
@@ -129,17 +129,17 @@ function dbGetProjects() {
   const userEmail = Session.getActiveUser().getEmail();
   const encodedEmail = encodeURIComponent(userEmail);
 
-  const ownedProjects = supabaseRequest('GET', `projects?owner_email=eq.${encodedEmail}&select=id,name`);
-  const memberProjects = supabaseRequest('GET', `project_members?user_email=eq.${encodedEmail}&access_level=eq.edit&select=projects(id,name)`);
+  const ownedProjects = supabaseRequest('get', `projects?owner_email=eq.${encodedEmail}&select=id,name`);
+  const memberProjects = supabaseRequest('get', `project_members?user_email=eq.${encodedEmail}&access_level=eq.edit&select=projects(id,name)`);
 
   const projectMap = new Map();
 
   if (ownedProjects) {
-    ownedProjects.forEach(p => projectMap.set(p.id, { id: p.id, name: p.name }));
+    ownedProjects.forEach((/** @type {{ id: any; name: any; }} */ p) => projectMap.set(p.id, { id: p.id, name: p.name }));
   }
 
   if (memberProjects) {
-    memberProjects.forEach(pm => {
+    memberProjects.forEach((/** @type {{ projects: { id: any; name: any; }; }} */ pm) => {
       if (pm.projects) {
         projectMap.set(pm.projects.id, { id: pm.projects.id, name: pm.projects.name });
       }
@@ -163,7 +163,7 @@ function dbCreateProject(projectData) {
     status: "active" 
   };
 
-  const res = supabaseRequest('POST', 'projects', payload);
+  const res = supabaseRequest('post', 'projects', payload);
   return res ? res[0] : null;
 }
 
@@ -174,7 +174,7 @@ function dbCreateProject(projectData) {
  */
 function dbCheckMyProfile() {
   const email = Session.getActiveUser().getEmail().toLowerCase();
-  const profile = supabaseRequest('GET', `user_profiles?email=eq.${encodeURIComponent(email)}`);
+  const profile = supabaseRequest('get', `user_profiles?email=eq.${encodeURIComponent(email)}`);
   
   if (profile && profile.length > 0) {
     return profile[0];
@@ -196,7 +196,7 @@ function dbCreateProfile(displayName, weeklyCapacity) {
     weekly_capacity_hours: weeklyCapacity || 40
   };
   
-  const res = supabaseRequest('POST', 'user_profiles', payload);
+  const res = supabaseRequest('post', 'user_profiles', payload);
   return res ? res[0] : null;
 }
 
@@ -207,7 +207,7 @@ function dbCreateProfile(displayName, weeklyCapacity) {
  */
 function dbUpdateProfile(email, profileData) {
   const safeEmail = encodeURIComponent(email.toLowerCase());
-  return supabaseRequest('PATCH', `user_profiles?email=eq.${safeEmail}`, profileData);
+  return supabaseRequest('patch', `user_profiles?email=eq.${safeEmail}`, profileData);
 }
 
 /**
@@ -218,10 +218,10 @@ function dbInviteTeammate(teammateEmail) {
   const cleanEmail = teammateEmail.trim().toLowerCase();
   const currentUser = Session.getActiveUser().getEmail();
   
-  const existing = supabaseRequest('GET', `user_profiles?email=eq.${encodeURIComponent(cleanEmail)}`);
+  const existing = supabaseRequest('get', `user_profiles?email=eq.${encodeURIComponent(cleanEmail)}`);
   if (existing && existing.length > 0) return; 
 
-  supabaseRequest('POST', 'user_profiles', {
+  supabaseRequest('post', 'user_profiles', {
     email: cleanEmail,
     display_name: "Invited User",
     role: "pending" 
@@ -243,6 +243,23 @@ function dbInviteTeammate(teammateEmail) {
   try {
     GmailApp.sendEmail(cleanEmail, subject, body);
   } catch (err) {
+    // @ts-ignore
     console.warn("Could not send invite email to " + cleanEmail + " error: " + err.message);
   }
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {  
+    supabaseRequest, 
+    dbCreateTask, 
+    dbUpdateTask,
+    dbGetTasks,
+    dbDeleteTask,
+    dbGetProjects,
+    dbCreateProject,
+    dbCheckMyProfile,
+    dbCreateProfile,
+    dbUpdateProfile,
+    dbInviteTeammate 
+  };
 }

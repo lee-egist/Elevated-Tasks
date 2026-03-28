@@ -437,3 +437,22 @@ function getWorkspaceDirectoryEmails() {
     return []; 
   }
 }
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    doGet,
+    getDashboardData,
+    createDashboardTask,
+    updateDashboardTaskStatus,
+    updateDashboardTaskDetails,
+    deleteTask,
+    isValidUUID, // It's likely here!
+    getDashboardProjects,
+    createNewProject,
+    migrateLegacyGoogleTasks,
+    processCSVImport,
+    ensureCurrentUserProfile,
+    submitUserOnboarding,
+    getWorkspaceDirectoryEmails
+  };
+}
