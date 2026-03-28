@@ -50,6 +50,7 @@ export default [
         dbCreateProfile: "writable",
         dbCheckMyProfile: "writable",
         dbInviteTeammate: "writable",
+        dbUpdateProfile: "writable",
         
         // (We will add dbCreateProject here shortly!)
       },

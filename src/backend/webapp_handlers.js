@@ -393,16 +393,35 @@ function ensureCurrentUserProfile() {
 /**
  * 🛡️ RESTORED: Called by the Onboarding Modal to finalize the user's account.
  */
+
+/**
+ * Called by the Onboarding Modal to finalize the user's account.
+ */
 function submitUserOnboarding(displayName, weeklyCapacity) {
   try {
     if (!displayName || displayName.trim() === "") throw new Error("Display name is required.");
     
-    // Create or overwrite the pending profile
-    dbCreateProfile(displayName.trim(), parseFloat(weeklyCapacity) || 40);
+    const email = Session.getActiveUser().getEmail().toLowerCase();
+    
+    // 1. Check if the silent generator already made a placeholder profile
+    const existingProfile = dbCheckMyProfile();
+
+    if (existingProfile) {
+      // 2. If it exists, UPDATE the existing row cleanly!
+      const payload = {
+        display_name: displayName.trim(),
+        weekly_capacity_hours: parseFloat(weeklyCapacity) || 40
+      };
+      dbUpdateProfile(email, payload); 
+    } else {
+      // 3. If they somehow don't exist yet, CREATE a brand new profile
+      dbCreateProfile(displayName.trim(), parseFloat(weeklyCapacity) || 40);
+    }
+
     return true;
   } catch (err) {
-    console.error("Error creating profile: " + err);
-    throw new Error("Failed to create profile: " + err.message, { cause: err });
+    console.error("Error updating profile: " + err);
+    throw new Error("Failed to save profile: " + err.message, { cause: err });
   }
 }
 

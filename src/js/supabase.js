@@ -212,3 +212,11 @@ function dbInviteTeammate(teammateEmail) {
     console.warn("Could not send invite email to " + cleanEmail + " error: " + err.message);
   }
 }
+
+/**
+ * Updates an existing user profile by their email address.
+ */
+function dbUpdateProfile(email, profileData) {
+  const safeEmail = encodeURIComponent(email.toLowerCase());
+  return supabaseRequest('PATCH', `user_profiles?email=eq.${safeEmail}`, profileData);
+}
