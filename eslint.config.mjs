@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import jest from "eslint-plugin-jest";
+import globals from "globals"
 
 
 export default [
@@ -13,24 +14,27 @@ export default [
       ecmaVersion: 2022,
       sourceType: "script",
       globals: {
+        ...globals.browser,
+        ...globals.node,
         ...globals.jest,
+        ...globals.googleappsscripts,
         // Essential Google Apps Script Globals
-        SpreadsheetApp: "readonly",
-        DriveApp: "readonly",
-        DocumentApp: "readonly",
-        GmailApp: "readonly",
-        Session: "readonly",
-        Logger: "readonly",
-        HtmlService: "readonly",
-        UrlFetchApp: "readonly",
-        Utilities: "readonly",
-        PropertiesService: "readonly",
-        People: "readonly",
-        ScriptApp: "readonly",
-        CardService: "readonly",
-        Tasks: "readonly",
-        console: "readonly",
-        AdminDirectory: "readonly",
+        // SpreadsheetApp: "readonly",
+        // DriveApp: "readonly",
+        // DocumentApp: "readonly",
+        // GmailApp: "readonly",
+        // Session: "readonly",
+        // Logger: "readonly",
+        // HtmlService: "readonly",
+        // UrlFetchApp: "readonly",
+        // Utilities: "readonly",
+        // PropertiesService: "readonly",
+        // People: "readonly",
+        // ScriptApp: "readonly",
+        // CardService: "readonly",
+        // Tasks: "readonly",
+        // console: "readonly",
+        // AdminDirectory: "readonly",
 
         // --- Custom Global Functions ---
         // UI & Handlers
