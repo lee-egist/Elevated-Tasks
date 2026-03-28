@@ -12,8 +12,7 @@
     </div>
 
     <form id="editForm" onsubmit="saveTaskEdit(event)" class="p-5 max-h-[70vh] overflow-y-auto">
-      <input type="hidden" id="edit-taskId">
-      <input type="hidden" id="edit-taskListId">
+      <input type="hidden" id="edit-task-id">
       <input type="hidden" id="edit-status">
 
       <div class="space-y-4">
@@ -27,6 +26,7 @@
           <textarea id="edit-description" class="w-full border border-gray-300 rounded-lg shadow-sm p-2.5 outline-none"
             rows="3"></textarea>
         </div>
+        
         <div class="mb-4">
           <label class="block text-sm font-semibold text-gray-700 mb-1">Project</label>
           <div class="flex gap-2">
@@ -41,6 +41,18 @@
             </button>
           </div>
         </div>
+
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1">Assignee</label>
+          <input 
+            type="email" 
+            id="edit-assignee" 
+            list="workspace-users-list" 
+            onclick="requireCompleteProfile(this)" 
+            placeholder="e.g., teammate@company.com" 
+            class="w-full bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 p-2.5 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all">
+        </div>
+
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-semibold text-gray-700 mb-1">Priority</label>
