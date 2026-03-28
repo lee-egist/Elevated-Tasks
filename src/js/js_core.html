@@ -32,6 +32,32 @@
     }
   }
 
+  // --- ONBOARDING FORM HANDLER ---
+  function handleOnboardingSubmit(event) {
+    event.preventDefault(); 
+    
+    const btn = document.getElementById('onboardingSubmitBtn');
+    btn.innerText = "Setting up workspace...";
+    btn.disabled = true;
+
+    const name = document.getElementById('onboardName').value;
+    const capacity = document.getElementById('onboardCapacity').value;
+
+    google.script.run
+      .withSuccessHandler(function() {
+        // Hide the modal, update local state, and refresh data!
+        document.getElementById('onboardingModal').style.display = 'none';
+        if (currentUserProfile) currentUserProfile.is_basic = false; 
+        loadTasks();
+      })
+      .withFailureHandler(function(err) {
+        alert("Setup failed: " + err.message);
+        btn.innerText = "Complete Setup & Enter Dashboard";
+        btn.disabled = false;
+      })
+      .submitUserOnboarding(name, capacity);
+  }
+
   // --- API COMMUNICATION ---
   function loadTasks() {
     document.getElementById('board').classList.add('hidden');
