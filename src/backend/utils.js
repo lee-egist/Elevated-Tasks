@@ -62,3 +62,46 @@ function buildElevatedNotes(userNotes, metadataObj) {
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
+
+/**
+ * Fetches all active users in the Google Workspace directory.
+ * Fails gracefully if the user is on a free Gmail account or lacks admin permissions.
+ */
+function getWorkspaceUsers() {
+  const users = [];
+  
+  try {
+    let pageToken;
+    do {
+      // Fetches users from the current Workspace domain
+      const response = AdminDirectory.Users.list({
+        customer: 'my_customer',
+        maxResults: 100,
+        query: "isSuspended=false",
+        pageToken: pageToken
+      });
+
+      if (response.users) {
+        response.users.forEach(user => {
+          users.push({
+            email: user.primaryEmail,
+            name: user.name.fullName
+          });
+        });
+      }
+      pageToken = response.nextPageToken;
+    } while (pageToken);
+
+  } catch (err) {
+    console.warn("Could not fetch Workspace directory (likely a personal account or missing permissions): " + err.message);
+    
+    // Fallback: Just return the active user so the autocomplete isn't totally broken
+    const myEmail = Session.getActiveUser().getEmail();
+    users.push({
+      email: myEmail,
+      name: myEmail.split('@')[0]
+    });
+  }
+  
+  return users;
+}

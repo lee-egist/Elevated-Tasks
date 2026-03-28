@@ -19,10 +19,12 @@ export default [
         UrlFetchApp: "readonly",
         Utilities: "readonly",
         PropertiesService: "readonly",
+        People: "readonly",
         ScriptApp: "readonly",
         CardService: "readonly",
         Tasks: "readonly",
         console: "readonly",
+        AdminDirectory: "readonly",
 
         // --- Custom Global Functions ---
         // UI & Handlers
@@ -31,14 +33,23 @@ export default [
         getWorkspaceUsers: "writable",
         isValidUUID: "writable",
         createNewProject: "writable",
+        ensureCurrentUserProfile: "writable",
         
         // Supabase Database API
+        // Tasks
         dbCreateTask: "writable",
         dbDeleteTask: "writable",
         dbGetTasks: "writable",
-        dbGetProjects: "writable",
         dbUpdateTask: "writable",
-        dbCreateProject: "writable"
+
+        // Projects
+        dbGetProjects: "writable",
+        dbCreateProject: "writable",
+
+        // Profile
+        dbCreateProfile: "writable",
+        dbCheckMyProfile: "writable",
+        dbInviteTeammate: "writable",
         
         // (We will add dbCreateProject here shortly!)
       },

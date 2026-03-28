@@ -1,4 +1,39 @@
 <script>
+
+  // --- GLOBALS & STARTUP SEQUENCE ---
+  let currentUserProfile = null;
+
+  // Wait for the HTML to finish loading, then check the profile and fetch data
+  window.addEventListener('DOMContentLoaded', function () {
+    google.script.run
+      .withSuccessHandler(function (profile) {
+        currentUserProfile = profile;
+
+        // Fetch your actual dashboard data (update these names if yours are different!)
+        if (typeof fetchProjects === 'function') fetchProjects();
+        if (typeof loadTasks === 'function') loadTasks();
+      })
+      .withFailureHandler(function (err) {
+        console.error("Failed to ensure profile: ", err);
+        if (typeof fetchProjects === 'function') fetchProjects();
+        if (typeof loadTasks === 'function') loadTasks();
+      })
+      .ensureCurrentUserProfile();
+  });
+
+  // --- JUST-IN-TIME ONBOARDING INTERCEPTOR ---
+  function requireCompleteProfile(element) {
+    if (currentUserProfile && currentUserProfile.is_basic) {
+      if (element) element.blur(); // Stop them from typing
+
+      const modalHeader = document.querySelector('#onboardingModal h2');
+      const modalSubtext = document.querySelector('#onboardingModal p');
+      if (modalHeader) modalHeader.innerText = "Team Feature Unlocked!";
+      if (modalSubtext) modalSubtext.innerText = "Before you can assign tasks to others, please complete your profile.";
+
+      document.getElementById('onboardingModal').style.display = 'flex';
+    }
+  }
   // --- STATE & CONFIG ---
   let currentTasks = [];
   let currentView = 'board'; // Default View
@@ -13,7 +48,7 @@
     document.getElementById('table-view').classList.add('hidden');
     document.getElementById('no-results').classList.add('hidden');
     document.getElementById('loading').classList.remove('hidden');
-    
+
     google.script.run
       .withSuccessHandler(receiveData)
       .withFailureHandler(showError)
@@ -23,8 +58,8 @@
   function receiveData(tasks) {
     currentTasks = tasks;
     document.getElementById('loading').classList.add('hidden');
-    populateProjectFilter(tasks); 
-    applyFiltersAndSort(); 
+    populateProjectFilter(tasks);
+    applyFiltersAndSort();
   }
 
   function showError(err) {
@@ -46,21 +81,21 @@
     applyFiltersAndSort();
   }
 
-// --- UPDATED DASHBOARD FILTER ---
+  // --- UPDATED DASHBOARD FILTER ---
   function renderDashboardProjectFilter(projects) {
     const projectSelect = document.getElementById('filter-project');
     if (!projectSelect) return;
-    
+
     const currentSelection = projectSelect.value;
-    
+
     // We use the UUID as the value now!
     let optionsHtml = '<option value="all">All Projects</option><option value="unassigned">No Project</option>';
     projects.forEach(p => {
       optionsHtml += `<option value="${p.id}">${p.name}</option>`;
     });
-    
+
     projectSelect.innerHTML = optionsHtml;
-    
+
     // Attempt to restore their previous selection if it still exists
     const exists = projects.some(p => p.id === currentSelection);
     if (currentSelection === 'unassigned' || exists) {
@@ -74,7 +109,7 @@
   function calculateCriticalPath(tasks) {
     const activeTasks = tasks.filter(t => t.status !== 'completed');
     const adjList = {};
-    
+
     activeTasks.forEach(t => adjList[t.id] = []);
     activeTasks.forEach(t => {
       // If t is blocked by another active task, create a path: blocker -> t
@@ -92,14 +127,14 @@
 
       currentPathVisited.add(nodeId);
       let maxSubPath = [];
-      
+
       for (const neighbor of adjList[nodeId]) {
         const subPath = dfs(neighbor, new Set(currentPathVisited));
         if (subPath.length > maxSubPath.length) {
           maxSubPath = subPath;
         }
       }
-      
+
       memo[nodeId] = [nodeId, ...maxSubPath];
       return memo[nodeId];
     }
@@ -126,7 +161,7 @@
     let processedTasks = currentTasks.filter(task => {
       if (statusFilter !== 'all' && task.status !== statusFilter) return false;
       if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
-      
+
       const taskProject = (task.project || '').trim();
       if (projectFilter !== 'all') {
         if (projectFilter === 'unassigned' && taskProject !== '') return false;
@@ -151,7 +186,7 @@
         case 'priorityAsc': return (priorityWeights[a.priority || ''] || 0) - (priorityWeights[b.priority || ''] || 0);
         case 'titleAsc': return (a.title || '').localeCompare(b.title || '');
         case 'projectAsc': return (a.project || '').localeCompare(b.project || '');
-        default: return 0; 
+        default: return 0;
       }
     });
 
@@ -161,7 +196,7 @@
       document.getElementById('table-view').classList.add('hidden');
       document.getElementById('no-results').classList.remove('hidden');
     } else {
-      
+
       // --- NEW: Calculate Critical Path ---
       let criticalPathIds = [];
       // Usually, it only makes sense to highlight the critical path if viewing a specific project
@@ -172,7 +207,7 @@
       // Pass the IDs to the renderers
       renderBoard(processedTasks, criticalPathIds);
       renderTable(processedTasks, criticalPathIds);
-      switchView(currentView); 
+      switchView(currentView);
     }
   }
 
@@ -194,4 +229,5 @@
       if (!noResults) { tableContainer.classList.remove('hidden'); boardContainer.classList.add('hidden'); }
     }
   }
+
 </script>

@@ -233,12 +233,20 @@ function migrateLegacyGoogleTasks() {
         }
       }
 
-      // Build the strict payload for Supabase
+// 1. Extract and clean the assignee email
+      const assigneeEmail = metadata.assignee ? metadata.assignee.toLowerCase() : currentUser;
+
+      // 2. 🛡️ Check: If it's a teammate, create their placeholder and invite them!
+      if (assigneeEmail !== currentUser) {
+        dbInviteTeammate(assigneeEmail);
+      }
+
+      // 3. Build the strict payload for Supabase
       const payload = {
         title: task.title,
         description: description,
         owner: currentUser,
-        assignee: metadata.assignee || currentUser, // Default to self if unassigned
+        assignee: assigneeEmail, // Use the extracted email here!
         status: metadata.status || (task.status === "completed" ? "completed" : "open"),
         priority: metadata.priority || "medium",
         type: metadata.type || "general",
@@ -308,11 +316,14 @@ function processCSVImport(csvContent, platform) {
       let status = "open";
       // eslint-disable-next-line no-useless-assignment
       let projectName = "";
+      // eslint-disable-next-line no-useless-assignment
+      let assigneeEmail = null; // 👈 NEW: Default to null
 
       if (platform === 'asana') {
         title = rowData['name'] || "Untitled Asana Task";
         description = rowData['notes'] || "";
         projectName = rowData['projects'] || "";
+        assigneeEmail = rowData['assignee'] || rowData['assignee email'] || null; // 👈 NEW
         // Asana doesn't use standard statuses often, usually sections
       }
       else if (platform === 'trello') {
@@ -320,18 +331,21 @@ function processCSVImport(csvContent, platform) {
         description = rowData['card description'] || "";
         projectName = rowData['board name'] || "";
         status = rowData['list name'] ? "in_progress" : "open"; // Rough guess based on lists
+        assigneeEmail = rowData['members'] || rowData['member'] || null; // 👈 NEW
       }
       else if (platform === 'jira') {
         title = rowData['summary'] || "Untitled Jira Issue";
         description = rowData['description'] || "";
         projectName = rowData['project name'] || "";
         status = (rowData['status'] && rowData['status'].toLowerCase() === 'done') ? 'completed' : 'open';
+        assigneeEmail = rowData['assignee'] || null; // 👈 NEW
       }
       else {
         // Generic Fallback
         title = rowData['title'] || rowData['name'] || rowData['task'] || "Untitled Task";
         description = rowData['description'] || rowData['notes'] || "";
         projectName = rowData['project'] || "";
+        assigneeEmail = rowData['assignee'] || rowData['email'] || null; // 👈 NEW
       }
 
       if (!title || title.trim() === "") return; // Skip completely blank rows
@@ -351,13 +365,27 @@ function processCSVImport(csvContent, platform) {
         }
       }
 
+ // 🛡️ NEW: Validate the assignee email and invite them if necessary
+      if (assigneeEmail && assigneeEmail.includes('@')) {
+        assigneeEmail = assigneeEmail.trim().toLowerCase();
+        
+        if (assigneeEmail !== currentUser) {
+          dbInviteTeammate(assigneeEmail); // Creates placeholder and sends email!
+        }
+      } else {
+        // If the CSV just said "Bob" instead of "bob@company.com", we must set it to null 
+        // to protect your database's strict email formatting rules.
+        assigneeEmail = null; 
+      }
+
       // Build the Supabase Payload
       const payload = {
         title: title,
         description: description,
         owner: currentUser,
+        assignee: assigneeEmail, // 👈 NEW: Add the clean email here!
         status: status,
-        priority: "medium", // Default to medium for imports unless specifically mapped
+        priority: "medium", 
         project_id: projectId
       };
 
@@ -371,5 +399,32 @@ function processCSVImport(csvContent, platform) {
   } catch (err) {
     console.error("CSV Import Error: " + err);
     throw new Error("Failed to process CSV: " + err.message, { cause: err });
+  }
+}
+
+/**
+ * Silently ensures the user has a profile so database Foreign Keys don't crash.
+ * Flags the profile as "basic" if they haven't filled out the official onboarding form yet.
+ */
+function ensureCurrentUserProfile() {
+  try {
+    const email = Session.getActiveUser().getEmail().toLowerCase();
+    const defaultName = email.split('@')[0]; // e.g., "erick" from "erick@domain.com"
+    
+    let profile = dbCheckMyProfile();
+
+    if (!profile) {
+      // 1. Silently create a basic profile
+      profile = dbCreateProfile(defaultName, 40);
+      profile.is_basic = true; 
+    } else {
+      // 2. If their Display Name is exactly their email prefix, they haven't done the setup yet
+      profile.is_basic = (profile.display_name === defaultName || profile.display_name === "Invited User");
+    }
+
+    return profile;
+  } catch (err) {
+    console.error("Error ensuring profile: " + err);
+    throw new Error("Failed to verify user profile: " + err.message, { cause: err });
   }
 }

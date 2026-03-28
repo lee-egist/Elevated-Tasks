@@ -20,11 +20,6 @@
         "userSymbol": "People",
         "version": "v1",
         "serviceId": "peopleapi"
-      },
-      {
-        "userSymbol": "AdminDirectory",
-        "version": "directory_v1",
-        "serviceId": "admin"
       }
     ]
   },

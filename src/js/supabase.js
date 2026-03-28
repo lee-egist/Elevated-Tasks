@@ -144,3 +144,71 @@ function dbCreateProject(projectData) {
   const res = supabaseRequest('POST', 'projects', payload);
   return res ? res[0] : null;
 }
+
+/**
+ * Checks if the current active user has a profile.
+ */
+function dbCheckMyProfile() {
+  const email = Session.getActiveUser().getEmail().toLowerCase();
+  const profile = supabaseRequest('GET', `user_profiles?email=eq.${encodeURIComponent(email)}`);
+  
+  if (profile && profile.length > 0) {
+    return profile[0];
+  }
+  return null;
+}
+
+/**
+ * Creates a brand new user profile (Used during Onboarding)
+ */
+function dbCreateProfile(displayName, weeklyCapacity) {
+  const email = Session.getActiveUser().getEmail().toLowerCase();
+  
+  const payload = {
+    email: email,
+    display_name: displayName,
+    weekly_capacity_hours: weeklyCapacity || 40
+  };
+  
+  const res = supabaseRequest('POST', 'user_profiles', payload);
+  return res ? res[0] : null;
+}
+
+/**
+ * Creates a placeholder profile for a teammate and emails them an invite.
+ */
+function dbInviteTeammate(teammateEmail) {
+  const cleanEmail = teammateEmail.trim().toLowerCase();
+  const currentUser = Session.getActiveUser().getEmail();
+  
+  // 1. Check if they already exist
+  const existing = supabaseRequest('GET', `user_profiles?email=eq.${encodeURIComponent(cleanEmail)}`);
+  if (existing && existing.length > 0) return; // They already exist, do nothing!
+
+  // 2. Create the placeholder profile (so your database foreign keys don't break!)
+  supabaseRequest('POST', 'user_profiles', {
+    email: cleanEmail,
+    display_name: "Invited User",
+    role: "pending" // You can use this later to show "Pending" badges in the UI
+  });
+
+  // 3. Send them an actual email invite!
+  const webAppUrl = ScriptApp.getService().getUrl(); 
+  const subject = `You've been invited to Elevated Tasks by ${currentUser}`;
+  const body = `
+    Hi there!
+    
+    ${currentUser} just assigned you a task in Elevated Tasks. 
+    
+    Click the link below to set up your profile and view your dashboard:
+    ${webAppUrl}
+    
+    See you inside!
+  `;
+  
+  try {
+    GmailApp.sendEmail(cleanEmail, subject, body);
+  } catch (err) {
+    console.warn("Could not send invite email to " + cleanEmail + " error: " + err.message);
+  }
+}
