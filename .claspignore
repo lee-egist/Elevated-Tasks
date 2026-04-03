@@ -9,3 +9,6 @@ package-lock.json
 eslint.config.mjs
 jest.config.js
 .gitignore
+
+# Ignore schema files
+.sql
